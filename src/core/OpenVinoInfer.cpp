@@ -4,19 +4,23 @@
 
 OpenVinoInfer::OpenVinoInfer()
 {
+    m_core = nullptr;
+    m_model = nullptr;
+    m_compiled_model = nullptr;
+    m_infer_request = nullptr;
     std::cout << "<(*^_^*)> Create OpenVino inference engine..." << std::endl;
 }
 
 
-const _device_type OpenVinoInfer::GetInferenceType() const{
-    return _device_type::OpenVino;
+const DEVICE_TYPE OpenVinoInfer::GetInferenceType() const{
+    return DEVICE_TYPE::OpenVino;
 }
 
 
 void OpenVinoInfer::CreateInferenceEngine(){
-    m_core = ov::Core();
+    m_core = std::make_unique<ov::Core>(ov::Core());
     // 获取可用设备
-    std::vector<std::string> devices = m_core.get_available_devices();
+    std::vector<std::string> devices = m_core->get_available_devices();
 
     // 检查是否有可用设备
     if (devices.empty()) {
@@ -29,7 +33,7 @@ void OpenVinoInfer::CreateInferenceEngine(){
     if (std::find(devices.begin(), devices.end(), "GPU") != devices.end()) {
         m_device = "GPU";
     }
-    m_core.set_property(m_device, ov::cache_dir("OpenVinoCache_" + m_device));
+    m_core->set_property(m_device, ov::cache_dir("OpenVinoCache_" + m_device));
     std::cout << std::format("<(*^_^*)> OpenVino[{}] Inference Created Successfully\n", m_device.c_str());
 };
 
@@ -46,8 +50,12 @@ ResultData<std::string> OpenVinoInfer::LoadModel(std::string file_path,
         return_data.error_message = "<(E`_`E)> Model path is empty, please check your path.";
         return return_data;
     }
+    if(!m_core){
+        return_data.error_message = "<(E`_`E)> ov::Core is NULL, please execute CreateInferenceEngine().";
+        return return_data;
+    }
     InferenceCommon::TryFunction([&](){
-        m_model = m_core.read_model(file_path);
+        m_model = m_core->read_model(file_path);
         if(file_path.find(".xml") == std::string::npos){
             int idx = file_path.find_last_of('/');
             if (idx != std::string::npos){
@@ -62,10 +70,10 @@ ResultData<std::string> OpenVinoInfer::LoadModel(std::string file_path,
             std::string save_path = "./model/" + file_path.substr(0,file_path.find_last_of('.'))+ ".xml";
             std::cout << "    Save model path: " << save_path << std::endl;
             return_data.result_info = save_path;
-            if (!InferenceCommon::isFileExist(save_path.c_str())) {
+            if (!InferenceCommon::IsFileExist(save_path.c_str())) {
                 save_model(m_model,save_path);
             }
-            m_model = m_core.read_model(save_path);
+            m_model = m_core->read_model(save_path);
         }
         std::cout << "<(*^_^*)> Inference model (OpenVino) has been created successfully."<< std::endl;;
     },return_data);
@@ -160,9 +168,9 @@ ResultData<bool> OpenVinoInfer::CreateEngine(std::string& engine_path){
         // 应用预处理 根据配置构建
         m_model = ppp.build();
         // 编译模型
-        m_compiled_model = m_core.compile_model(m_model, m_device);
+        m_compiled_model = std::make_unique<ov::CompiledModel>(m_core->compile_model(m_model, m_device));
         std::cout << "<(*^_^*)> Compile_model tensor has been created successfully."<< std::endl;;
-        m_infer_request = m_compiled_model.create_infer_request();
+        m_infer_request = std::make_unique<ov::InferRequest>(m_compiled_model->create_infer_request());
     },return_data);
     if(return_data.error_message.empty())
         return_data.result_state = true;
@@ -170,37 +178,43 @@ ResultData<bool> OpenVinoInfer::CreateEngine(std::string& engine_path){
 }
 
 
-ResultData<std::vector<float*>> OpenVinoInfer::Infer(std::vector<std::vector<size_t>>data_layout,std::vector<float*> data){
+bool OpenVinoInfer::Infer(const std::vector<std::vector<size_t>> &data_layouts,const std::vector<float*> &datas,std::vector<std::vector<float>> &output_datas){
     
-    ResultData<std::vector<float*>> return_data;
-    InferenceCommon::TryFunction([&](){
-    for (size_t i_idx = 0; i_idx < data_layout.size(); i_idx++)
-    {
-        ov::Tensor input_tensor(ov::element::f32, ov::Shape(data_layout[i_idx]), data[i_idx]);
-        m_infer_request.set_input_tensor(i_idx,input_tensor);
+    ResultData<bool> return_data;
+    if(!m_infer_request){
+        std::cout <<  "<(E`_`E)> Please execute CreateEngine() first" << std::endl;
+        return false;
     }
-    m_infer_request.start_async();
-    m_infer_request.wait();
-    
+    InferenceCommon::TryFunction([&](){
+    for (size_t i_idx = 0; i_idx < data_layouts.size(); i_idx++)
+    {
+        ov::Tensor input_tensor(ov::element::f32, ov::Shape(data_layouts[i_idx]), datas[i_idx]);
+        m_infer_request->set_input_tensor(i_idx,input_tensor);
+    }
+    m_infer_request->start_async();
+    m_infer_request->wait();
+    // output_datas = std::vector<std::shared_ptr<float>>(m_output_layouts.size(),nullptr);
     //处理输出
     for (size_t o_idx = 0; o_idx < m_output_layouts.size(); o_idx++)
     {
-        auto output = m_infer_request.get_output_tensor(o_idx);
+        auto output = m_infer_request->get_output_tensor(o_idx);
         const float* output_buffer = output.data<const float>();
-
         auto out_shape = output.get_shape();
         std::cout << "(O_O)>>>>>  "  << o_idx+1 << "/" << m_output_layouts.size() << "   ";
         for (size_t i = 0; i < out_shape.size(); i++)
         {
             std::cout << out_shape[i] << (i!= out_shape.size()-1 ? " x " : "");
         }
-        std::cout << std::endl;;
-        return_data.result_info.push_back(const_cast<float*>(output_buffer));
+        std::cout << std::endl;
+        size_t element_count = output.get_size();
+        std::vector<float> output_copy(element_count);
+        std::copy_n(output_buffer, element_count, output_copy.data());
+        output_datas.push_back(std::move(output_copy));
     }
     },return_data);
     if(return_data.error_message.empty())
         return_data.result_state = true;
-    return return_data;
+    return return_data.result_state;
 }
 
 ResultData<std::list<std::string>> OpenVinoInfer::GetInputNames(){
@@ -229,10 +243,10 @@ ResultData<std::list<std::string>> OpenVinoInfer::GetOutputNames(){
 void OpenVinoInfer::ReleaseInferenceEngine(){
         std::cout << "<(*-_-*)> Releasing OpenVino inference engine..." << std::endl;
         if (m_infer_request) {
-            m_infer_request = ov::InferRequest();
+            m_infer_request = nullptr;
         }
         if (m_compiled_model) {
-            m_compiled_model = ov::CompiledModel();
+            m_compiled_model = nullptr;
         }
         if (m_model) {
             m_model = nullptr;

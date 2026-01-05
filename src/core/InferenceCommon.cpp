@@ -1,34 +1,25 @@
 #include "InferenceCommon.hpp"
 #include "CudaFun.hpp"
-std::optional<cv::Mat> InferenceCommon::Data2Image(float** data_p,int H,int W, int C,float scale,bool available_cuda){
+
+std::optional<cv::Mat> InferenceCommon::DatatoImage(float** data_p,int H,int W, int C,float scale){
     try
     {
-        if(available_cuda){
-            cv::Mat output_image(H, W, CV_32FC3);
-            CUDA_1CHW_2_1HWC(data_p,H,W,C,scale);
-            float* data = *data_p;
-            output_image.data = (uchar*)(data);
-            cv::Mat output_image_8u;
-            output_image.convertTo(output_image_8u, CV_8UC3, 1.0f);
-            return output_image_8u;}
-        else{
-            cv::Mat output_image(H, W, CV_8UC3);
-            float* data = *data_p;
-            for (size_t i = 0; i < H; i++)
+        cv::Mat output_image(H, W, CV_8UC3);
+        float* data = *data_p;
+        for (size_t i = 0; i < H; i++)
+        {
+            for (size_t j = 0; j < W; j++) 
             {
-                for (size_t j = 0; j < W; j++) {
-                    for (size_t k = 0; k < C; k++)
-                    {
-                        float e = std::max(std::min((data[k * H * W + i * W + j] * 255.0f), 255.0f), 0.0f);
-                        output_image.at<cv::Vec3b>(i, j)[k] = e;
-                    }
+                for (size_t k = 0; k < C; k++)
+                {
+                    float e = std::max(std::min((data[k * H * W + i * W + j] * 255.0f), 255.0f), 0.0f);
+                    output_image.at<cv::Vec3b>(i, j)[k] = e;
                 }
             }
-            cv::Mat output_image_8u;
-            output_image.convertTo(output_image_8u, CV_8UC3, 1.0f);
-            return output_image_8u;
         }
-        
+        cv::Mat output_image_8u;
+        output_image.convertTo(output_image_8u, CV_8UC3, 1.0f);
+        return output_image_8u;
     }
     catch(const std::exception& e)
     {

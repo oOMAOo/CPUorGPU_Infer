@@ -27,11 +27,11 @@ namespace InferenceCommon
             std::cerr << state.error_message << std::endl;
         }
     }
-    inline bool isFileExist(const char* path){
+    inline bool IsFileExist(const char* path){
         struct stat buffer;
         return (stat(path, &buffer) == 0);
     }
-    std::optional<cv::Mat> Data2Image(float** data,int H,int W, int C,float scale,bool available_cuda);
+    std::optional<cv::Mat> DatatoImage(float** data_p,int H,int W, int C,float scale);
     // std::optional<float**> InferenceCommon::Image2Data(cv::Mat image);
     int GetNVIDIADriverVersion();
 };

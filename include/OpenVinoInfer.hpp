@@ -5,10 +5,10 @@
 class OpenVinoInfer:public InferenceApi
 {
 private:
-    ov::Core m_core;
+    std::unique_ptr<ov::Core> m_core;
     std::shared_ptr<ov::Model> m_model;
-    ov::CompiledModel m_compiled_model;
-    ov::InferRequest m_infer_request;
+    std::unique_ptr<ov::CompiledModel> m_compiled_model;
+    std::unique_ptr<ov::InferRequest> m_infer_request;
     std::string m_device;
 
     std::vector<std::pair<std::string,std::vector<size_t>>> m_input_layouts;
@@ -22,7 +22,7 @@ public:
 
     /// @brief 获取当前推理引擎类型枚举
     /// @return _device_type::OpenVino
-    const _device_type GetInferenceType() const override;
+    const DEVICE_TYPE GetInferenceType() const override;
     
     /// @brief 获取输入层名称列表
     ResultData<std::list<std::string>> GetInputNames() override;
@@ -43,14 +43,15 @@ public:
     ResultData<bool> CreateEngine(std::string& engine_path)override;
 
     /// @brief 根据输入执行推理
-    /// @param data_layout 输入数据布局 例:{{1,3,224,224},{1,3,224,224},{1,3,224,224}..}
-    /// @param data 输入数据
+    /// @param data_layouts 输入数据布局 例:{{1,3,224,224},{1,3,224,224},{1,3,224,224}..}
+    /// @param datas 输入数据
+    /// @param output_datas 输入数据
     /// @return 输出数据
-    ResultData<std::vector<float*>> Infer(std::vector<std::vector<size_t>>data_layout,std::vector<float*> data)override;
+    bool Infer(const std::vector<std::vector<size_t>> &data_layouts,const std::vector<float*> &datas,std::vector<std::vector<float>> &output_datas)override;
 
     /// @brief 释放资源
     void ReleaseInferenceEngine() override;
-    
+
     ~OpenVinoInfer() override {ReleaseInferenceEngine();}
 };
 

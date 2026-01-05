@@ -13,8 +13,8 @@ void TensorRTInfer::CreateInferenceEngine(){
     context = nullptr;
     std::cout << "<(*^_^*)> TensorRT Inference Created Successfully" << std::endl;
 }
-const _device_type TensorRTInfer::GetInferenceType() const{
-    return _device_type::TensorRT;
+const DEVICE_TYPE TensorRTInfer::GetInferenceType() const{
+    return DEVICE_TYPE::TensorRT;
 };
 
 ResultData<std::list<std::string>> TensorRTInfer::GetInputNames(){
@@ -177,7 +177,7 @@ ResultData<std::string> TensorRTInfer::LoadModel(std::string file_path,
         std::string trt_engine_path = "./model/" + file_path.substr(0,file_path.find_last_of('.'))+ ".trt";
         return_data.result_info = trt_engine_path;
         std::cout << "    Save model path: " << trt_engine_path << std::endl;
-        if (!InferenceCommon::isFileExist(trt_engine_path.c_str())) {
+        if (!InferenceCommon::IsFileExist(trt_engine_path.c_str())) {
             if(!convertONNXToTensorRT(onnx_file_path,trt_engine_path,false)){
                 return_data.error_message = "<(E`_`E)> convertONNXToTensorRT() failed...";
             };
@@ -273,17 +273,17 @@ ResultData<bool> TensorRTInfer::CreateEngine(std::string& engine_path){
     
 }
 
-ResultData<std::vector<float*>> TensorRTInfer::Infer(std::vector<std::vector<size_t>>data_layout,std::vector<float*> data){
+bool TensorRTInfer::Infer(const std::vector<std::vector<size_t>> &data_layouts,const std::vector<float*> &datas,std::vector<std::vector<float>> &output_datas){
     //图像数据拷贝进 GPU 输入内存块
     ResultData<std::vector<float*>> return_data;
     InferenceCommon::TryFunction<std::vector<float*>>([&](){
-        MY_ASSERT(m_input_layouts.size() == data.size(),"Please check the size() of your input data...");
+        MY_ASSERT(m_input_layouts.size() == datas.size(),"Please check the size() of your input data...");
         for (size_t i_idx = 0; i_idx < m_input_layouts.size(); i_idx++)
         {
             //计算每个 输入 头内存用量
             int size_num = accumulate(m_input_layouts[i_idx].second.begin(), m_input_layouts[i_idx].second.end(), 1, std::multiplies<int>());
             //CPU -> GPU
-            CUDA_CHECK(cudaMemcpyAsync(gpu_input_buffers[i_idx], data[i_idx], size_num * sizeof(float), cudaMemcpyHostToDevice, stream));
+            CUDA_CHECK(cudaMemcpyAsync(gpu_input_buffers[i_idx], datas[i_idx], size_num * sizeof(float), cudaMemcpyHostToDevice, stream));
             std::cout << std::format("    GPU input buffer [{}/{}] is ready.\n",i_idx+1,m_input_layouts.size());
         }
         //执行推理
@@ -300,6 +300,11 @@ ResultData<std::vector<float*>> TensorRTInfer::Infer(std::vector<std::vector<siz
             float* cpu_output_buffer= new float[size_num];
             //GPU -> CPU
             CUDA_CHECK(cudaMemcpyAsync(cpu_output_buffer, gpu_output_buffers[o_idx], size_num * sizeof(float), cudaMemcpyDeviceToHost));
+  
+            std::vector<float> output_copy(size_num);
+            std::copy_n(cpu_output_buffer, size_num, output_copy.data());
+            output_datas.push_back(std::move(output_copy));
+
             std::cout << std::format("    GPU output buffer [{}/{}] is ready.\n",o_idx+1,m_output_layouts.size());
             return_data.result_info.push_back(cpu_output_buffer);
         }
@@ -309,7 +314,7 @@ ResultData<std::vector<float*>> TensorRTInfer::Infer(std::vector<std::vector<siz
         return_data.result_state = true;
     }
     std::cout << "<(*^_^*)> Infer(...) Successfully" << std::endl;
-    return return_data;
+    return return_data.result_state;
 
 }
 
@@ -330,6 +335,10 @@ void TensorRTInfer::ReleaseInferenceEngine(){
     }
     delete[] gpu_output_buffers;
     gpu_output_buffers = nullptr;
-
+    context = nullptr;
+    engine = nullptr;
+    runtime = nullptr;
+    
+    
 }
 

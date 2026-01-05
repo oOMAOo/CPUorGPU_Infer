@@ -2,7 +2,8 @@
 #include <string>
 #include <functional>
 #include <iostream>
-enum _device_type{
+
+enum DEVICE_TYPE{
     OpenVino = 0,
     TensorRT = 1
 };
