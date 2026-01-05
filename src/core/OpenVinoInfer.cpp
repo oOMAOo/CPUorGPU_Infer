@@ -1,15 +1,17 @@
 #include <OpenVinoInfer.hpp>
 #include <InferenceCommon.hpp>
-#include <assert.h>
+#include <format>
 
 OpenVinoInfer::OpenVinoInfer()
 {
     std::cout << "<(*^_^*)> Create OpenVino inference engine..." << std::endl;
 }
 
+
 const _device_type OpenVinoInfer::GetInferenceType() const{
     return _device_type::OpenVino;
 }
+
 
 void OpenVinoInfer::CreateInferenceEngine(){
     m_core = ov::Core();
@@ -30,6 +32,7 @@ void OpenVinoInfer::CreateInferenceEngine(){
     m_core.set_property(m_device, ov::cache_dir("OpenVinoCache_" + m_device));
     std::cout << std::format("<(*^_^*)> OpenVino[{}] Inference Created Successfully\n", m_device.c_str());
 };
+
 
 ResultData<std::string> OpenVinoInfer::LoadModel(std::string file_path,
                                         std::vector<std::pair<std::string,std::vector<size_t>>>t_input_layouts,
@@ -71,7 +74,6 @@ ResultData<std::string> OpenVinoInfer::LoadModel(std::string file_path,
     return return_data;
 }
 
-//layout   例 first:OpenVINO输入格式(NCHW\NHWC\NC?\NC...\N...C)    second:(1,224,224,3)
 ResultData<bool> OpenVinoInfer::CreateEngine(std::string& engine_path){
 
     ResultData<bool> return_data;
@@ -167,10 +169,7 @@ ResultData<bool> OpenVinoInfer::CreateEngine(std::string& engine_path){
     return return_data;
 }
 
-/// @brief 
-/// @param data_layout 输入数据布局
-/// @param data 输入数据
-/// @return 
+
 ResultData<std::vector<float*>> OpenVinoInfer::Infer(std::vector<std::vector<size_t>>data_layout,std::vector<float*> data){
     
     ResultData<std::vector<float*>> return_data;

@@ -18,13 +18,31 @@ const _device_type TensorRTInfer::GetInferenceType() const{
 };
 
 ResultData<std::list<std::string>> TensorRTInfer::GetInputNames(){
-    //TODO
     ResultData<std::list<std::string>> return_data;
+    if(!engine){
+        return_data.error_message = "<(E`_`E)> engine has not been cteated...";
+    }else{
+        for (size_t i_idx = 0; i_idx < m_input_layouts.size(); i_idx++)
+        {
+            const char* input_name = engine->getIOTensorName(i_idx);
+            return_data.result_info.push_back(input_name);
+        }
+        return_data.result_state = true;
+    }
     return return_data;
 }
 ResultData<std::list<std::string>> TensorRTInfer::GetOutputNames(){
-    //TODO
     ResultData<std::list<std::string>> return_data;
+        if(!engine){
+        return_data.error_message = "<(E`_`E)> engine has not been cteated...";
+    }else{
+        for (size_t i_idx = 0; i_idx < m_output_layouts.size(); i_idx++)
+        {
+            const char* input_name = engine->getIOTensorName(m_input_layouts.size() + i_idx);
+            return_data.result_info.push_back(input_name);
+        }
+        return_data.result_state = true;
+    }
     return return_data;
 }
 
@@ -74,7 +92,6 @@ bool TensorRTInfer::convertONNXToTensorRT(
     {
         auto shape = shapes[i_idx].second;
         auto input_name = network->getInput(i_idx)->getName();
-        // 设置动态形状范围
         nvinfer1::Dims min_dims = network->getInput(i_idx)->getDimensions();
         nvinfer1::Dims opt_dims = network->getInput(i_idx)->getDimensions();
         nvinfer1::Dims max_dims = network->getInput(i_idx)->getDimensions();
@@ -97,6 +114,7 @@ bool TensorRTInfer::convertONNXToTensorRT(
                 max_dims.d[i] = shape[i];
             }
         }
+        // 设置动态形状范围
         profile->setDimensions(input_name, nvinfer1::OptProfileSelector::kMIN, min_dims);
         profile->setDimensions(input_name, nvinfer1::OptProfileSelector::kOPT, opt_dims);
         profile->setDimensions(input_name, nvinfer1::OptProfileSelector::kMAX, max_dims);
@@ -166,7 +184,6 @@ ResultData<std::string> TensorRTInfer::LoadModel(std::string file_path,
         }
     }
     },return_data);
-
     if(return_data.error_message.empty()){
         return_data.result_state = true;
     }
@@ -238,7 +255,7 @@ ResultData<bool> TensorRTInfer::CreateEngine(std::string& engine_path){
         }
         for (size_t o_idx = 0; o_idx < m_output_layouts.size(); o_idx++)
         {
-            // 分配输出头GPU内存
+            //分配输出头GPU内存
             int size_num = accumulate(m_output_layouts[o_idx].second.begin(), m_output_layouts[o_idx].second.end(), 1, std::multiplies<int>());
             CUDA_CHECK(cudaMalloc((void**)&gpu_output_buffers[o_idx], size_num * sizeof(float)));
             int real_idx = m_input_layouts.size() + o_idx;

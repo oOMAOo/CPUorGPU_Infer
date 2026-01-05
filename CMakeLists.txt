@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 20)
 
 
 
-# 编译器设置
+# 编译器设置 // 后续可以测试补充更多架构
 set(CMAKE_CUDA_ARCHITECTURES "89")
 
 # 检测CUDA设备
@@ -27,13 +27,14 @@ if(MSVC)
     # 通用编译选项
     add_compile_options(
         $<$<COMPILE_LANGUAGE:CXX>:/Zc:__cplusplus>      # 正确的 __cplusplus 宏
+        $<$<COMPILE_LANGUAGE:CXX>:/std:c++20>      # 正确的 __cplusplus 宏
         $<$<COMPILE_LANGUAGE:CXX>:/W4>                  # 警告级别4
         $<$<COMPILE_LANGUAGE:CXX>:/Zc:inline>           # 移除未使用的函数
         $<$<COMPILE_LANGUAGE:CXX>:/MP>                  # 多处理器编译
         $<$<COMPILE_LANGUAGE:CXX>:/utf-8>               # 源代码和可执行文件使用UTF-8
         $<$<COMPILE_LANGUAGE:CXX>:/EHsc>                # C++异常处理
-        $<$<COMPILE_LANGUAGE:CXX>:/diagnostics:caret>   # 更好的错误信息
-
+        $<$<COMPILE_LANGUAGE:CXX>:/GS>                  # 启用安全检查
+        $<$<COMPILE_LANGUAGE:CXX>:/diagnostics:column>  # 更好的错误信息（列信息）
     )
 endif()
 

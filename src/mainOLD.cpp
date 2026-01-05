@@ -2,6 +2,7 @@
 #include <cuda_runtime_api.h>
 #include <NvInfer.h>
 #include <CudaFun.hpp>
+
 static inline double now_ms()
 {
     return std::chrono::duration<double, std::milli>(
