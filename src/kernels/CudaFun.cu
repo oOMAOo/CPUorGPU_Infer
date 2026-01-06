@@ -22,7 +22,7 @@ __global__ void HWC2CHW(float* from_buffer, float* to_buffer, int H, int W, int 
     if (h_i < H && w_i < W) {
 
         // RGBRGBRGB... -> CHW   RRRR...GGGG...BBBB...
-        for (size_t c_i = 0; c_i < 3; c_i++)
+        for (int c_i = 0; c_i < 3; c_i++)
         {
             int from_idx = h_i * W* C + w_i*C + c_i; // image 索引
             int to_idx = c_i*H*W + h_i*W + w_i; // buffer 索引

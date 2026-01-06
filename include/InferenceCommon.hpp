@@ -5,6 +5,7 @@
 #include "InferenceStruct.h"
 #include "opencv2/opencv.hpp"
 #include <optional>
+#define MODELPATH "./model"
 // 自定义异常
 #define MY_ASSERT(condition, message) \
     do { \
@@ -27,12 +28,8 @@ namespace InferenceCommon
             std::cerr << state.error_message << std::endl;
         }
     }
-    inline bool IsFileExist(const char* path){
-        struct stat buffer;
-        return (stat(path, &buffer) == 0);
-    }
     std::optional<cv::Mat> DatatoImage(float** data_p,int H,int W, int C,float scale);
     // std::optional<float**> InferenceCommon::Image2Data(cv::Mat image);
-    int GetNVIDIADriverVersion();
+    bool GetAvailableCUDA();
 };
 

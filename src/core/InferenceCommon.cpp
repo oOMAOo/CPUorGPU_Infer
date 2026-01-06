@@ -6,20 +6,18 @@ std::optional<cv::Mat> InferenceCommon::DatatoImage(float** data_p,int H,int W, 
     {
         cv::Mat output_image(H, W, CV_8UC3);
         float* data = *data_p;
-        for (size_t i = 0; i < H; i++)
+        for (int i = 0; i < H; i++)
         {
-            for (size_t j = 0; j < W; j++) 
+            for (int j = 0; j < W; j++) 
             {
-                for (size_t k = 0; k < C; k++)
+                for (int k = 0; k < C; k++)
                 {
-                    float e = std::max(std::min((data[k * H * W + i * W + j] * 255.0f), 255.0f), 0.0f);
-                    output_image.at<cv::Vec3b>(i, j)[k] = e;
+                    //cv::saturate_cast 强制转换为指定类型，并确保转换过程中像素值不会超出取值范围
+                    output_image.at<cv::Vec3b>(i, j)[k] = cv::saturate_cast<uchar>(data[k * H * W + i * W + j] * scale);
                 }
             }
         }
-        cv::Mat output_image_8u;
-        output_image.convertTo(output_image_8u, CV_8UC3, 1.0f);
-        return output_image_8u;
+        return output_image;
     }
     catch(const std::exception& e)
     {
@@ -47,29 +45,39 @@ std::optional<cv::Mat> InferenceCommon::DatatoImage(float** data_p,int H,int W, 
 //         return std::nullopt;
 //     }
 // }
-int InferenceCommon::GetNVIDIADriverVersion()
-{
-    std::unique_ptr<FILE, decltype(&_pclose)> pipe(
-        _popen("nvidia-smi --query-gpu=driver_version --format=csv,noheader", "r"),
-        _pclose
-    );
 
-    if (pipe) {
-        char buffer[32];
-        if (fgets(buffer, sizeof(buffer), pipe.get())) {
-            // 解析版本，如 "535.98" -> 53598
-            std::string version(buffer);
-            size_t dot = version.find('.');
-            if (dot != std::string::npos) {
-                try {
-                    int major = std::stoi(version.substr(0, dot));
-                    int minor = std::stoi(version.substr(dot + 1));
-                    return major * 100 + minor;
-                } catch (...) {
-                }
-            }
+bool InferenceCommon::GetAvailableCUDA()
+{
+    try
+    {
+        int driver_count;
+        CUDA_CHECK(cudaGetDeviceCount(&driver_count));
+
+        if (driver_count == 0) {
+            std::cout << "Can't find a NVIDIA GPU" << std::endl;
         }
+        int runtime_version;
+        cudaRuntimeGetVersion(&runtime_version);
+        std::cout << "Detect " << driver_count << " NVIDIA GPU \nCUDA Runtime Version:"<< runtime_version << std::endl;
+        //主要不是0个，就取第一个设备
+        cudaDeviceProp device_prop;
+        cudaGetDeviceProperties(&device_prop, 0);
+        std::cout << "=== Device Name :" << device_prop.name << " ===" << std::endl;
+        std::cout << "Compute Capability:" << device_prop.major << "." << device_prop.minor << std::endl;
+        std::cout << "GlobalMem:" << device_prop.totalGlobalMem / (1024 * 1024) << " MB" << std::endl;
+        std::cout << "CUDA Processor Count:" << device_prop.multiProcessorCount << std::endl;
+        std::cout << std::endl;
+
+        if(device_prop.major*10 + device_prop.minor == 89)
+        {
+            return true;
+        }
+            
     }
-    return 0;
+    catch(const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+    }
+    return false;
 }
 

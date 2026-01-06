@@ -24,13 +24,13 @@ private:
     /// @param trt_engine_path 引擎保存路径
     /// @param fp16_flag 开启f16模式
     /// @return 
-    bool convertONNXToTensorRT(const std::string& onnx_path, const std::string& trt_engine_path, bool fp16_flag);
+    bool ConvertONNXToTensorRT(const std::string& onnx_path, const std::string& trt_engine_path, bool fp16_flag);
     /// @brief 读取引擎文件二进制数据
     /// @return 数据列表
-    std::vector<unsigned char> loadEngineFile(const std::string& file_name);
+    std::vector<unsigned char> LoadEngineFile(const std::string& file_name);
     /// @brief 反序列化引擎
     /// @param engine_name 引擎路径
-    void deserializeEngine(std::string& engine_name);
+    void DeserializeEngine(std::string& engine_name);
 
     std::unique_ptr<nvinfer1::IRuntime> runtime;
     std::unique_ptr<nvinfer1::ICudaEngine> engine;
@@ -42,7 +42,7 @@ private:
     // GPU 输出buffer池
     float** gpu_output_buffers;
 public:
-    TensorRTInfer(){};
+    TensorRTInfer();
 
    /// @brief 初始化当前推理配置
     void CreateInferenceEngine() override;

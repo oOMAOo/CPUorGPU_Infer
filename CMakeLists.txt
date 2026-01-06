@@ -14,13 +14,13 @@ include(CheckLanguage)
 check_language(CUDA)
 if(CMAKE_CUDA_COMPILER)
     message(Use Cuda: ${CMAKE_CUDA_COMPILER})
-    add_definitions(-DUSE_CUDA)
     set(USE_CUDA ON)
     enable_language(CUDA)
 else()
-    message(Warning: Can't\ Find Cuda ...\ Set\ USE_CUDA\ OFF)
+    #失败退出
+    message(FATAL_ERROR Can't\ Find\ Cuda ...)
     set(USE_CUDA OFF)
-endif()
+endif() 
 
 
 if(MSVC)
@@ -57,29 +57,28 @@ if(CMAKE_SYSTEM_PROCESSOR STREQUAL "AMD64" AND WIN32)
 endif()
 
 
-if(USE_CUDA)
-    # =============== CUDA （需根据安装自行替换路径） ===============
-    set(CUDA_ROOT "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.0")
-    set(CUDA_INCLUDE_DIR ${CUDA_ROOT}/include)
-    set(CUDA_LIB_DIR ${CUDA_ROOT}/lib)
-    set(CUDA_BIN_DIR ${CUDA_ROOT}/bin/x64)
-    list(APPEND IncludeDirs ${CUDA_INCLUDE_DIR})
-    # Only Windows 64
-    if(CMAKE_SYSTEM_PROCESSOR STREQUAL "AMD64" AND WIN32)
-        list(APPEND LibDirs ${CUDA_LIB_DIR})
-        list(APPEND BinDirs ${CUDA_BIN_DIR})
-    endif()
-    # ========================== TensorRT ==========================
-    set(TensorRT_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/dep/tensorrt)
-    set(TensorRT_INCLUDE_DIR ${TensorRT_ROOT}/include)
-    set(TensorRT_LIB_DIR ${TensorRT_ROOT}/lib)
-    set(TensorRT_BIN_DIR ${TensorRT_ROOT}/bin)
-    list(APPEND IncludeDirs ${TensorRT_INCLUDE_DIR})
-    # Only Windows 64
-    if(CMAKE_SYSTEM_PROCESSOR STREQUAL "AMD64" AND WIN32)
-        list(APPEND LibDirs ${TensorRT_LIB_DIR})
-        list(APPEND BinDirs ${TensorRT_BIN_DIR})
-    endif()
+
+# =============== CUDA （需根据安装自行替换路径） ===============
+set(CUDA_ROOT "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.0")
+set(CUDA_INCLUDE_DIR ${CUDA_ROOT}/include)
+set(CUDA_LIB_DIR ${CUDA_ROOT}/lib)
+set(CUDA_BIN_DIR ${CUDA_ROOT}/bin/x64)
+list(APPEND IncludeDirs ${CUDA_INCLUDE_DIR})
+# Only Windows 64
+if(CMAKE_SYSTEM_PROCESSOR STREQUAL "AMD64" AND WIN32)
+    list(APPEND LibDirs ${CUDA_LIB_DIR})
+    list(APPEND BinDirs ${CUDA_BIN_DIR})
+endif()
+# ========================== TensorRT ==========================
+set(TensorRT_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/dep/tensorrt)
+set(TensorRT_INCLUDE_DIR ${TensorRT_ROOT}/include)
+set(TensorRT_LIB_DIR ${TensorRT_ROOT}/lib)
+set(TensorRT_BIN_DIR ${TensorRT_ROOT}/bin)
+list(APPEND IncludeDirs ${TensorRT_INCLUDE_DIR})
+# Only Windows 64
+if(CMAKE_SYSTEM_PROCESSOR STREQUAL "AMD64" AND WIN32)
+    list(APPEND LibDirs ${TensorRT_LIB_DIR})
+    list(APPEND BinDirs ${TensorRT_BIN_DIR})
 endif()
  
 # ============================= OpenVINO =============================
