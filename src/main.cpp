@@ -75,7 +75,7 @@ int main(){
         std::cout << std::format("<(E`_`E)> Can't Open the image: {}\n", input_img);
         return -1;
     }
-    std::cout << std::format("\n(I_I)>>>>> Input image size : {} x {}\n", (int)INPUT_W, (int)INPUT_H);
+    std::cout << std::format("\n(I_I)>>>>> Input image size : {} x {}\n", INPUT_W, INPUT_H);
     cv::Mat blob = cv::dnn::blobFromImage(image, 1.0f/255.0f,cv::Size(INPUT_W,INPUT_H)); // HWC -> NCHW
 
     std::vector<std::vector<size_t>>data_layout;
