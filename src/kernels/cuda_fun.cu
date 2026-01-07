@@ -90,7 +90,6 @@ std::optional<cv::Mat> CudaFun::DatatoImage(float** data_ptr,int data_size,float
             return std::nullopt;
         }
         CUDA_CHWtoHWC(data_ptr,scale);
-        return std::nullopt;
         cv::Mat output_image(m_height, m_width, CV_32FC3,*data_ptr);
         cv::Mat output_image_8u;
         output_image.convertTo(output_image_8u, CV_8UC3, 1.0f);

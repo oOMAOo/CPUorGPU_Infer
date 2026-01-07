@@ -17,7 +17,7 @@
 #define INPUT_W 1050
 #define INPUT_H 1550
 int main(){
-    std::string input_img = "C:\\Users\\影擎星图\\Desktop\\nafnet_demo\\input.jpg";
+    std::string input_img = "C:\\Users\\影擎星图\\Desktop\\nafnet_demo\\CUDA-13.1.png";
     std::string model_path = "C:\\Users\\影擎星图\\Desktop\\nafnet_demo\\nafnet_ep304_20251117.onnx";
 
     if(!std::filesystem::is_regular_file(std::filesystem::u8path(input_img)) || !std::filesystem::is_regular_file(std::filesystem::u8path(model_path))){
@@ -106,6 +106,8 @@ int main(){
             cv::resize(output_image,output_image,image.size());
             cv::imshow("Output", output_image);
             cv::waitKey(0);
+        }else {
+            std::cerr << "DatatoImage Error" << std::endl;
         }
     }
     output_datas.clear();
