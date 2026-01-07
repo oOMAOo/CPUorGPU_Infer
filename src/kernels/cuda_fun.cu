@@ -35,8 +35,8 @@ __global__ void HWC2CHW(float* from_buffer, float* to_buffer, int H, int W, int 
 
 CudaFun::CudaFun(int height,int width, int channel): m_height(height), m_width(width), m_channel(channel)
 {
-    CUDA_CHECK(cudaMalloc((void**)&m_transform_buffer, m_height*m_width*m_channel*sizeof(float)));
-    CUDA_CHECK(cudaMalloc((void**)&m_gpu_buffer, m_height*m_width*m_channel*sizeof(float)));
+    CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&m_transform_buffer), m_height*m_width*m_channel*sizeof(float)));
+    CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&m_gpu_buffer), m_height*m_width*m_channel*sizeof(float)));
     CUDA_CHECK(cudaStreamCreate(&m_stream));
 }
 
