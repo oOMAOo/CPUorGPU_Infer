@@ -1,7 +1,8 @@
 #pragma once
 #include <cuda_runtime_api.h>
-#include <opencv2/opencv.hpp>
 #include <string>
+
+#include <opencv2/opencv.hpp>
 #ifndef CUDA_CHECK
 #define CUDA_CHECK(callstr)\
     do {\
@@ -17,20 +18,20 @@
 class CudaFun
 {
 private:
-    float* gpu_buffer_;
-    float* transform_buffer_;
-    cudaStream_t stream_;
-    int H_;
-    int W_;
-    int C_;
-    void CUDA_CHWtoHWC(float** data,float scale);
-    void CUDA_HWCtoCHW(float** data,float scale);
+    float* m_gpu_buffer;
+    float* m_transform_buffer;
+    cudaStream_t m_stream;
+    int m_height;
+    int m_width;
+    int m_channel;
+    void CUDA_CHWtoHWC(float** data_ptr,float scale);
+    void CUDA_HWCtoCHW(float** data_ptr,float scale);
 public:
     CudaFun(int H, int W, int C);
-    std::optional<cv::Mat> Data2Image(float** data_p, int data_size, float scale);
-    int Get_W(){return W_;};
-    int Get_H(){return H_;};
-    int Get_C(){return C_;};
+    std::optional<cv::Mat> DatatoImage(float** data_ptr, int data_size, float scale);
+    inline int GetHeight(){return m_height;};
+    inline int GetWidth(){return m_width;};
+    inline int GetChannel(){return m_channel;};
     ~CudaFun();
 
 };

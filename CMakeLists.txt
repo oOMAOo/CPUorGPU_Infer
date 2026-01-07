@@ -28,7 +28,7 @@ if(MSVC)
     add_compile_options(
         $<$<COMPILE_LANGUAGE:CXX>:/Zc:__cplusplus>      # 正确的 __cplusplus 宏
         $<$<COMPILE_LANGUAGE:CXX>:/std:c++20>      # 正确的 __cplusplus 宏
-        $<$<COMPILE_LANGUAGE:CXX>:/W4>                  # 警告级别4
+        $<$<COMPILE_LANGUAGE:CXX>:/W3>                  # 警告级别4
         $<$<COMPILE_LANGUAGE:CXX>:/Zc:inline>           # 移除未使用的函数
         $<$<COMPILE_LANGUAGE:CXX>:/MP>                  # 多处理器编译
         $<$<COMPILE_LANGUAGE:CXX>:/utf-8>               # 源代码和可执行文件使用UTF-8

@@ -1,19 +1,27 @@
-#include "TensorRTInfer.hpp"
-#include "InferenceCommon.hpp"
-#include "CudaFun.hpp"
-#include <NvOnnxParser.h>
+#include "tensorrt_infer.hpp"
 #include <numeric>
 #include <fstream>
 #include <filesystem>
 #include <format>
+#include <NvOnnxParser.h>
+#include "inference_common.hpp"
+#include "cuda_fun.hpp"
 
-TensorRTInfer::TensorRTInfer(){
+class Logger : public nvinfer1::ILogger {
+public:
+    void log(Severity severity, const char* msg) noexcept override {
+        if (severity <= Severity::kWARNING) {
+            std::cout << msg << std::endl;
+        }
+    }
+};
+
+
+void TensorRTInfer::CreateInferenceEngine(){
     runtime = nullptr;
     engine = nullptr;
     context = nullptr;
-};
-
-void TensorRTInfer::CreateInferenceEngine(){
+    CUDA_CHECK(cudaStreamCreate(&stream));
     std::cout << "<(*^_^*)> TensorRT Inference Created Successfully" << std::endl;
 }
 const DEVICE_TYPE TensorRTInfer::GetInferenceType() const{
@@ -22,12 +30,12 @@ const DEVICE_TYPE TensorRTInfer::GetInferenceType() const{
 
 ResultData<std::list<std::string>> TensorRTInfer::GetInputNames(){
     ResultData<std::list<std::string>> return_data;
-    if(!engine){
+    if (!engine) {
         return_data.error_message = "<(E`_`E)> engine has not been cteated...";
     }else{
-        for (int i_idx = 0; i_idx < m_input_layouts.size(); i_idx++)
+        for (int input_idx = 0; input_idx < m_input_layouts.size(); input_idx++)
         {
-            const char* input_name = engine->getIOTensorName(i_idx);
+            const char* input_name = engine->getIOTensorName(input_idx);
             return_data.result_info.push_back(input_name);
         }
         return_data.result_state = true;
@@ -36,12 +44,12 @@ ResultData<std::list<std::string>> TensorRTInfer::GetInputNames(){
 }
 ResultData<std::list<std::string>> TensorRTInfer::GetOutputNames(){
     ResultData<std::list<std::string>> return_data;
-        if(!engine){
+        if (!engine) {
         return_data.error_message = "<(E`_`E)> engine has not been cteated...";
     }else{
-        for (int i_idx = 0; i_idx < m_output_layouts.size(); i_idx++)
+        for (int input_idx = 0; input_idx < m_output_layouts.size(); input_idx++)
         {
-            const char* input_name = engine->getIOTensorName(m_input_layouts.size() + i_idx);
+            const char* input_name = engine->getIOTensorName(m_input_layouts.size() + input_idx);
             return_data.result_info.push_back(input_name);
         }
         return_data.result_state = true;
@@ -55,18 +63,13 @@ bool TensorRTInfer::ConvertONNXToTensorRT(
     std::unique_ptr<nvinfer1::IBuilder> builder(nvinfer1::createInferBuilder(logger));
     MY_ASSERT(builder,"Convert ONNX to TensorRT : Create builder in error..." );
 
-    // 显式 1 batch
     const auto explicit_batch = 1U << static_cast<uint32_t>(nvinfer1::NetworkDefinitionCreationFlag::kEXPLICIT_BATCH);
     std::unique_ptr<nvinfer1::INetworkDefinition> network(builder->createNetworkV2(explicit_batch));
     MY_ASSERT(network,"Convert ONNX to TensorRT : Create network in error...");
 
-    // 解析ONNX文件
     std::unique_ptr<nvonnxparser::IParser> parser(nvonnxparser::createParser(*network, logger));
     MY_ASSERT(parser,"Convert ONNX to TensorRT : Create onnx parser in error...");
-
     std::cout << "<(*^_^*)> builder |  network | parser is ready. Start building the engine." << std::endl;
-
-    //模型转换
     if (!parser->parseFromFile(std::filesystem::u8path(onnx_path).string().c_str(), static_cast<int>(nvinfer1::ILogger::Severity::kWARNING))) {
         std::cerr << "<(E`_`E)> Convert ONNX to TensorRT : Can't parser the ONNX file" << onnx_path << std::endl;
         for (int i = 0; i < parser->getNbErrors(); ++i) {
@@ -78,7 +81,6 @@ bool TensorRTInfer::ConvertONNXToTensorRT(
     // 创建构建配置
     std::unique_ptr<nvinfer1::IBuilderConfig> config(builder->createBuilderConfig());
     MY_ASSERT(config,"Convert ONNX to TensorRT : Create builder config in error...");
-    // 查看是否要设置FP16
     if (fp16_flag && builder->platformHasFastFp16()) {
         config->setFlag(nvinfer1::BuilderFlag::kFP16);
         std::cout << "    Set FP16 model..." << std::endl;
@@ -86,24 +88,18 @@ bool TensorRTInfer::ConvertONNXToTensorRT(
     else if (fp16_flag) {
         std::cout << "   Your GPU don't support FP16 model..." << std::endl;
     }
-    //创建配置项
     nvinfer1::IOptimizationProfile* profile = builder->createOptimizationProfile();
     MY_ASSERT(profile,"Convert ONNX to TensorRT : Create profile in error...");
-    //检测定义的输入头个数是否跟模型实际个数一致
     MY_ASSERT(network->getNbInputs() == m_input_layouts.size(),"network NbInputs!=shapes.size()");
    
-    for (int i_idx = 0; i_idx < network->getNbInputs(); i_idx++)
+    for (int input_idx = 0; input_idx < network->getNbInputs(); input_idx++)
     {
-        auto shape = m_input_layouts[i_idx].second;
-        // 获取输入头名称
-        auto input_name = network->getInput(i_idx)->getName();
-
-        //获取并打印input形状 固定形状，只选取一个进行设置
-        nvinfer1::Dims opt_dims = network->getInput(i_idx)->getDimensions();
-        // nvinfer1::Dims min_dims = network->getInput(i_idx)->getDimensions();
-        // nvinfer1::Dims opt_dims = min_dims;
-        // nvinfer1::Dims max_dims = min_dims;
-        std::cout << "<(*^_^*)> Model input "<< std::to_string(i_idx) <<" Shape: ";
+        auto shape = m_input_layouts[input_idx].second;
+        auto input_name = network->getInput(input_idx)->getName();
+        nvinfer1::Dims min_dims = network->getInput(input_idx)->getDimensions();
+        nvinfer1::Dims opt_dims = min_dims;
+        nvinfer1::Dims max_dims = min_dims;
+        std::cout << "<(*^_^*)> Model input "<< std::to_string(input_idx) <<" Shape: ";
         for (int i = 0; i < opt_dims.nbDims; i++)
         {
             std::cout << opt_dims.d[i] << (i != opt_dims.nbDims - 1 ? " x " : "");
@@ -113,27 +109,24 @@ bool TensorRTInfer::ConvertONNXToTensorRT(
         {
             std::cout << shape[i] << (i != shape.size() - 1 ? " x " : "");
         }
-        std::cout << "   LayOut:" << m_input_layouts[i_idx].first << std::endl;
+        std::cout << "   LayOut:" << m_input_layouts[input_idx].first << std::endl;
 
         for (int i = 0; i < opt_dims.nbDims; ++i) {
             if (i < static_cast<int>(shape.size())) {
-                // min_dims.d[i] = shape[i];
+                min_dims.d[i] = shape[i];
                 opt_dims.d[i] = shape[i];
-                // max_dims.d[i] = shape[i];
+                max_dims.d[i] = shape[i];
             }
         }
-        // 为输入头设置形状
-        profile->setDimensions(input_name, nvinfer1::OptProfileSelector::kMIN, opt_dims);//min_dims
+        profile->setDimensions(input_name, nvinfer1::OptProfileSelector::kMIN, min_dims);
         profile->setDimensions(input_name, nvinfer1::OptProfileSelector::kOPT, opt_dims);
-        profile->setDimensions(input_name, nvinfer1::OptProfileSelector::kMAX, opt_dims);//max_dims
+        profile->setDimensions(input_name, nvinfer1::OptProfileSelector::kMAX, max_dims);
         config->addOptimizationProfile(profile);
     }
-
-    //打印模型输出形状
-    for (int o_idx = 0; o_idx < network->getNbOutputs(); o_idx++)
+    for (int output_idx = 0; output_idx < network->getNbOutputs(); output_idx++)
     {
-        nvinfer1::Dims output_dims = network->getOutput(o_idx)->getDimensions();
-        std::cout << "<(*^_^*)> Model output "<< std::to_string(o_idx) <<" Shape: ";
+        nvinfer1::Dims output_dims = network->getOutput(output_idx)->getDimensions();
+        std::cout << "<(*^_^*)> Model output "<< std::to_string(output_idx) <<" Shape: ";
         for (int i = 0; i < output_dims.nbDims; i++)
         {
             std::cout << output_dims.d[i] << (i != output_dims.nbDims - 1 ? " x " : "");
@@ -141,7 +134,6 @@ bool TensorRTInfer::ConvertONNXToTensorRT(
         std::cout << std::endl;
     }
 
-    //最高水平优化
     config->setBuilderOptimizationLevel(5);
 
     // 构建引擎
@@ -165,33 +157,31 @@ ResultData<std::string> TensorRTInfer::LoadModel(std::string file_path,
     std::vector<std::pair<std::string,std::vector<size_t>>>t_output_layouts){
     ResultData<std::string> return_data;
     InferenceCommon::TryFunction<std::string>([&](){
-    m_input_layouts = t_input_layouts;
-    m_output_layouts = t_output_layouts;
-
-    if(file_path.find(".trt") == std::string::npos){
-        std::string onnx_file_path = file_path;
-        int idx = file_path.find_last_of('/');
-        if (idx != std::string::npos){
-            idx+=1;
-            file_path = file_path.substr(idx,file_path.size()-idx);
-        }
-        int idx_1 = file_path.find_last_of('\\');
-        if (idx_1 != std::string::npos){
-            idx_1+=1;
-            file_path = file_path.substr(idx_1,file_path.size()-idx_1);
-        }
-        std::string trt_engine_path = std::format("{}/{}.trt",MODELPATH,file_path.substr(0,file_path.find_last_of('.')));
-        return_data.result_info = trt_engine_path;
-        std::cout << "    Save model path: " << trt_engine_path << std::endl;
-        if (!std::filesystem::exists(trt_engine_path)) {
-            //引擎文件不存在
-            if(!ConvertONNXToTensorRT(onnx_file_path,trt_engine_path,false)){
-                return_data.error_message = "<(E`_`E)> convertONNXToTensorRT() failed...";
-            };
-        }
+        m_input_layouts = t_input_layouts;
+        m_output_layouts = t_output_layouts;
+        if (file_path.find(".trt") == std::string::npos) {
+            std::string onnx_file_path = file_path;
+            int idx = file_path.find_last_of('/');
+            if (idx != std::string::npos) {
+                idx+=1;
+                file_path = file_path.substr(idx,file_path.size()-idx);
+            }
+            int idx_1 = file_path.find_last_of('\\');
+            if (idx_1 != std::string::npos) {
+                idx_1+=1;
+                file_path = file_path.substr(idx_1,file_path.size()-idx_1);
+            }
+            std::string trt_engine_path = std::format("{}/{}.trt",MODELPATH,file_path.substr(0,file_path.find_last_of('.')));
+            return_data.result_info = trt_engine_path;
+            std::cout << "    Save model path: " << trt_engine_path << std::endl;
+            if (!std::filesystem::exists(trt_engine_path)) {
+                if (!ConvertONNXToTensorRT(onnx_file_path,trt_engine_path,false)){
+                    return_data.error_message = "<(E`_`E)> convertONNXToTensorRT() failed...";
+                };
+            }
     }
     },return_data);
-    if(return_data.error_message.empty()){
+    if (return_data.error_message.empty()) {
         return_data.result_state = true;
     }
     std::cout << "<(*^_^*)> LoadModel(...) Successfully" << std::endl;
@@ -202,14 +192,19 @@ ResultData<std::string> TensorRTInfer::LoadModel(std::string file_path,
 std::vector<unsigned char> TensorRTInfer::LoadEngineFile(const std::string& file_name)
 {
     std::vector<unsigned char> engine_data;
-    std::ifstream engine_file(file_name, std::ios::binary);
+    std::ifstream engine_file(std::filesystem::u8path(file_name), std::ios::binary);
     if (!engine_file.is_open()) {
         MY_ASSERT(false, std::string("engine file :") + file_name + " can't open()...");
     }
+    //句柄移动到末尾
     engine_file.seekg(0, engine_file.end);
+    //询问位置得到整体length
     int length = engine_file.tellg();
+    //分配vector空间
     engine_data.resize(length);
+    //句柄回到开始
     engine_file.seekg(0, engine_file.beg);
+    //读取全部数据到 engine_data uchar*到char*要强转
     engine_file.read(reinterpret_cast<char*>(engine_data.data()), length);
     return engine_data;
 }
@@ -228,51 +223,56 @@ void TensorRTInfer::DeserializeEngine(std::string& engine_name) {
 ResultData<bool> TensorRTInfer::CreateEngine(std::string& engine_path){
     ResultData<bool> return_data;
     InferenceCommon::TryFunction<bool>([&](){
-        //反序列化引擎文件
         DeserializeEngine(engine_path);
-        CUDA_CHECK(cudaStreamCreate(&stream));
-        //输入输出头数量必须等于模型定义数量
-        MY_ASSERT(m_input_layouts.size()+m_output_layouts.size() == engine->getNbIOTensors(),
-                std::string("Input Layer num + Output Layer num != Model Layer num:") + std::to_string(engine->getNbIOTensors()));
-            
-        //准备 GPU 输入输出 Buffer数据
+        MY_ASSERT(
+            m_input_layouts.size()+m_output_layouts.size() == engine->getNbIOTensors(),
+            std::string("Input Layer num + Output Layer num != Model Layer num:") + std::to_string(engine->getNbIOTensors())
+        );
+        //输入输出 GPU 缓存
         gpu_input_buffers = new float*[m_input_layouts.size()];
         gpu_output_buffers = new float*[m_output_layouts.size()];
-        for (int i_idx = 0; i_idx < m_input_layouts.size(); i_idx++)
-        {
+        for (int input_idx = 0; input_idx < m_input_layouts.size(); input_idx++) {
             
-            int size_num = accumulate(m_input_layouts[i_idx].second.begin(), m_input_layouts[i_idx].second.end(), 1, std::multiplies<int>());
-            // 分配 输入 GPU内存
-            CUDA_CHECK(cudaMalloc((void**)&gpu_input_buffers[i_idx], size_num * sizeof(float)));
-            //输入节点名称
-            const char* input_name = engine->getIOTensorName(i_idx);
-            //绑定输入Buffer
-            context->setInputTensorAddress(input_name, gpu_input_buffers[i_idx]);
-            //定义输入形状
+            int size_num = accumulate(m_input_layouts[input_idx].second.begin(), m_input_layouts[input_idx].second.end(), 1, std::multiplies<int>());
+            CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&gpu_input_buffers[input_idx]), size_num * sizeof(float)));
+            const char* input_name = engine->getIOTensorName(input_idx);
+            bool state = context->setInputTensorAddress(input_name, gpu_input_buffers[input_idx]);
+            if (state) {
+                std::cout << std::format("    Input node [name:{}] has bind buffer [{}/{}].\n",input_name,input_idx+1,m_input_layouts.size());
+            }else{
+                return_data.error_message = std::format("<(E`_`E)> Input node [name:{}] can't bind gpu buffers.\n",input_name);
+                return;
+            }
             nvinfer1::Dims dims = engine->getTensorShape(input_name);
-            MY_ASSERT(dims.nbDims == m_input_layouts[i_idx].second.size(),"Input node: " + input_name + ":Please check your input_layout dims");
+            MY_ASSERT(dims.nbDims == m_input_layouts[input_idx].second.size(),"Input node: " + input_name + ":Please check your input_layout dims");
             for (int i = 0; i < dims.nbDims; i++)
             {
-                MY_ASSERT((dims.d[i]<=0 || dims.d[i] == m_input_layouts[i_idx].second[i]),"Model input size mismatch. Please delete the TRT engine file and rebuild.");
-                dims.d[i] = m_input_layouts[i_idx].second[i];
+                MY_ASSERT((dims.d[i]<=0 || dims.d[i] == m_input_layouts[input_idx].second[i]),"Model input size mismatch. Please delete the TRT engine file and rebuild.");
+                dims.d[i] = m_input_layouts[input_idx].second[i];
             }
-            context->setInputShape(input_name, dims);
-            std::cout << std::format("    Input node [name:{}] has bind buffer [{}/{}].\n",input_name,i_idx+1,m_input_layouts.size());
+            state = context->setInputShape(input_name, dims);
+            if (state) {
+            std::cout << std::format("    Input node [name:{}] has bind its shape.\n",input_name);
+            }else{
+                return_data.error_message = std::format("<(E`_`E)> Input node [name:{}] can't bind its shape.\n",input_name);
+                return;
+            }
+        }
+        for (int output_idx = 0; output_idx < m_output_layouts.size(); output_idx++) {
+            int size_num = accumulate(m_output_layouts[output_idx].second.begin(), m_output_layouts[output_idx].second.end(), 1, std::multiplies<int>());
+            CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&gpu_output_buffers[output_idx]), size_num * sizeof(float)));
+            int real_idx = m_input_layouts.size() + output_idx;
+            const char* output_name = engine->getIOTensorName(real_idx);
+            bool state = context->setOutputTensorAddress(output_name, gpu_output_buffers[output_idx]);
+            if (state) {
+                std::cout << std::format("    Output node [name:{}] has bind buffer [{}/{}].\n",output_name,output_idx+1,m_output_layouts.size());
+            }else{
+                return_data.error_message = std::format("<(E`_`E)> Output node [name:{}] can't bind gpu buffers.\n",output_name);
+            }
             
         }
-        for (int o_idx = 0; o_idx < m_output_layouts.size(); o_idx++)
-        {
-            //分配输出头GPU内存
-            int size_num = accumulate(m_output_layouts[o_idx].second.begin(), m_output_layouts[o_idx].second.end(), 1, std::multiplies<int>());
-            CUDA_CHECK(cudaMalloc((void**)&gpu_output_buffers[o_idx], size_num * sizeof(float)));
-            int real_idx = m_input_layouts.size() + o_idx;
-            //输出节点名称
-            const char* output_name = engine->getIOTensorName(real_idx);
-            context->setOutputTensorAddress(output_name, gpu_output_buffers[o_idx]);
-            std::cout << std::format("    Output node [name:{}] has bind buffer [{}/{}].\n",output_name,o_idx+1,m_output_layouts.size());
-        }
     },return_data);
-    if(return_data.error_message.empty()){
+    if (return_data.error_message.empty()) {
         std::cout << "<(*^_^*)> CreateEngine(...) Successfully" << std::endl;
         return_data.result_state = true;
     }
@@ -281,43 +281,34 @@ ResultData<bool> TensorRTInfer::CreateEngine(std::string& engine_path){
 }
 
 bool TensorRTInfer::Infer(const std::vector<std::vector<size_t>> &data_layouts,const std::vector<float*> &datas,std::vector<std::vector<float>> &output_datas){
-    //图像数据拷贝进 GPU 输入内存块
-    ResultData<std::vector<float*>> return_data;
-    InferenceCommon::TryFunction<std::vector<float*>>([&](){
-        MY_ASSERT(m_input_layouts.size() == datas.size(),"Please check the size() of your input data...");
-        for (int i_idx = 0; i_idx < m_input_layouts.size(); i_idx++)
+    ResultData<bool> return_data;
+    InferenceCommon::TryFunction<bool>([&](){
+        MY_ASSERT(datas.size() == m_input_layouts.size(),"Please check the size() of your input data...");
+        for (int input_idx = 0; input_idx < m_input_layouts.size(); input_idx++)
         {
-            //计算每个 输入 头内存用量
-            int size_num = accumulate(m_input_layouts[i_idx].second.begin(), m_input_layouts[i_idx].second.end(), 1, std::multiplies<int>());
-            //CPU -> GPU
-            CUDA_CHECK(cudaMemcpyAsync(gpu_input_buffers[i_idx], datas[i_idx], size_num * sizeof(float), cudaMemcpyHostToDevice, stream));
-            std::cout << std::format("    GPU input buffer [{}/{}] is ready.\n",i_idx+1,m_input_layouts.size());
+            //为GPU准备数据
+            int size_num = accumulate(m_input_layouts[input_idx].second.begin(), m_input_layouts[input_idx].second.end(), 1, std::multiplies<int>());
+            CUDA_CHECK(cudaMemcpyAsync(gpu_input_buffers[input_idx], datas[input_idx], size_num * sizeof(float), cudaMemcpyHostToDevice, stream));
+            std::cout << std::format("    GPU input buffer [{}/{}] is ready.\n",input_idx+1,m_input_layouts.size());
         }
-        //执行推理
         if (!context->enqueueV3(stream)) {
-            //推理失败
             return_data.error_message = "<(E`_`E)> Error: Inference run failed!";
             return;
         }
-        for (int o_idx = 0; o_idx < m_output_layouts.size(); o_idx++)
+        for (int output_idx = 0; output_idx < m_output_layouts.size(); output_idx++)
         {
-            //计算每个 输出 头内存用量
-            int size_num = accumulate(m_output_layouts[o_idx].second.begin(), m_output_layouts[o_idx].second.end(), 1, std::multiplies<int>());
-            // 分配CPU内存
+            //整理推理结果
+            int size_num = accumulate(m_output_layouts[output_idx].second.begin(), m_output_layouts[output_idx].second.end(), 1, std::multiplies<int>());
             float* cpu_output_buffer= new float[size_num];
-            //GPU -> CPU
-            CUDA_CHECK(cudaMemcpyAsync(cpu_output_buffer, gpu_output_buffers[o_idx], size_num * sizeof(float), cudaMemcpyDeviceToHost));
-  
+            CUDA_CHECK(cudaMemcpyAsync(cpu_output_buffer, gpu_output_buffers[output_idx], size_num * sizeof(float), cudaMemcpyDeviceToHost, stream));
             std::vector<float> output_copy(size_num);
             std::copy_n(cpu_output_buffer, size_num, output_copy.data());
             output_datas.push_back(std::move(output_copy));
-
-            std::cout << std::format("    GPU output buffer [{}/{}] is ready.\n",o_idx+1,m_output_layouts.size());
-            return_data.result_info.push_back(cpu_output_buffer);
+            std::cout << std::format("    GPU output buffer [{}/{}] is ready.\n",output_idx+1,m_output_layouts.size());
         }
-        cudaStreamSynchronize(stream);
+        CUDA_CHECK(cudaStreamSynchronize(stream));
     },return_data);
-    if(return_data.error_message.empty()){
+    if (return_data.error_message.empty()) {
         return_data.result_state = true;
     }
     std::cout << "<(*^_^*)> Infer(...) Successfully" << std::endl;

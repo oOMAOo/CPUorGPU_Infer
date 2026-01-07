@@ -2,9 +2,14 @@
 #include <string>
 #include <functional>
 #include <iostream>
-#include "InferenceStruct.h"
-#include "opencv2/opencv.hpp"
 #include <optional>
+
+#include <opencv2/opencv.hpp>
+
+#include "inference_struct.h"
+
+
+
 #define MODELPATH "./model"
 // 自定义异常
 #define MY_ASSERT(condition, message) \

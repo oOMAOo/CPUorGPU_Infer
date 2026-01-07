@@ -1,50 +1,26 @@
 #pragma once
-#include "InferenceApi.hpp"
-#include <NvInfer.h>
+#include "inference_api.hpp"
+#include <openvino/openvino.hpp>
 
-class Logger : public nvinfer1::ILogger {
-public:
-    void log(Severity severity, const char* msg) noexcept override {
-        if (severity <= Severity::kWARNING) {
-            std::cout << msg << std::endl;
-        }
-    }
-};
-
-class TensorRTInfer : public InferenceApi
+class OpenVinoInfer:public InferenceApi
 {
-    
 private:
+    std::unique_ptr<ov::Core> m_core;
+    std::shared_ptr<ov::Model> m_model;
+    std::unique_ptr<ov::CompiledModel> m_compiled_model;
+    std::unique_ptr<ov::InferRequest> m_infer_request;
+
+    //Intel 推理 驱动设备
+    std::string m_device;
     //输入布局
     std::vector<std::pair<std::string,std::vector<size_t>>> m_input_layouts;
     //输出布局
     std::vector<std::pair<std::string,std::vector<size_t>>> m_output_layouts;
-    /// @brief 使用onnx文件解析到引擎文件中
-    /// @param onnx_path onnx来源路径
-    /// @param trt_engine_path 引擎保存路径
-    /// @param fp16_flag 开启f16模式
-    /// @return 
-    bool ConvertONNXToTensorRT(const std::string& onnx_path, const std::string& trt_engine_path, bool fp16_flag);
-    /// @brief 读取引擎文件二进制数据
-    /// @return 数据列表
-    std::vector<unsigned char> LoadEngineFile(const std::string& file_name);
-    /// @brief 反序列化引擎
-    /// @param engine_name 引擎路径
-    void DeserializeEngine(std::string& engine_name);
 
-    std::unique_ptr<nvinfer1::IRuntime> runtime;
-    std::unique_ptr<nvinfer1::ICudaEngine> engine;
-    std::unique_ptr<nvinfer1::IExecutionContext> context;
-    cudaStream_t stream;
-    
-    // GPU 输入buffer池
-    float** gpu_input_buffers;
-    // GPU 输出buffer池
-    float** gpu_output_buffers;
 public:
-    TensorRTInfer();
+    OpenVinoInfer() = default;
 
-   /// @brief 初始化当前推理配置
+    /// @brief 初始化当前推理配置
     void CreateInferenceEngine() override;
 
     /// @brief 获取当前推理引擎类型枚举
@@ -73,13 +49,13 @@ public:
     /// @param data_layouts 输入数据布局 例:{{1,3,224,224},{1,3,224,224},{1,3,224,224}..}
     /// @param datas 输入数据
     /// @param output_datas 输入数据
-    /// @return bool
+    /// @return 输出数据
     bool Infer(const std::vector<std::vector<size_t>> &data_layouts,const std::vector<float*> &datas,std::vector<std::vector<float>> &output_datas)override;
 
     /// @brief 释放资源
     void ReleaseInferenceEngine() override;
 
-    ~TensorRTInfer()override{ReleaseInferenceEngine();}
+    ~OpenVinoInfer() override {ReleaseInferenceEngine();}
 };
 
 

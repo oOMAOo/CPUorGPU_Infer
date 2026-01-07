@@ -1,5 +1,5 @@
-#include "InferenceCommon.hpp"
-#include "CudaFun.hpp"
+#include "inference_common.hpp"
+#include "cuda_fun.hpp"
 
 std::optional<cv::Mat> InferenceCommon::DatatoImage(float** data_p,int H,int W, int C,float scale){
     try
@@ -55,29 +55,28 @@ bool InferenceCommon::GetAvailableCUDA()
 
         if (driver_count == 0) {
             std::cout << "Can't find a NVIDIA GPU" << std::endl;
+            return false;
         }
         int runtime_version;
-        cudaRuntimeGetVersion(&runtime_version);
-        std::cout << "Detect " << driver_count << " NVIDIA GPU \nCUDA Runtime Version:"<< runtime_version << std::endl;
-        //主要不是0个，就取第一个设备
+        CUDA_CHECK(cudaRuntimeGetVersion(&runtime_version));
+        std::cout << std::format("NVIDIA GPU Number: {}  \nCUDA Runtime Version:{}",driver_count,runtime_version) << std::endl;
+        //只打印第1个
         cudaDeviceProp device_prop;
-        cudaGetDeviceProperties(&device_prop, 0);
+        CUDA_CHECK(cudaGetDeviceProperties(&device_prop, 0));
         std::cout << "=== Device Name :" << device_prop.name << " ===" << std::endl;
         std::cout << "Compute Capability:" << device_prop.major << "." << device_prop.minor << std::endl;
         std::cout << "GlobalMem:" << device_prop.totalGlobalMem / (1024 * 1024) << " MB" << std::endl;
         std::cout << "CUDA Processor Count:" << device_prop.multiProcessorCount << std::endl;
         std::cout << std::endl;
-
-        if(device_prop.major*10 + device_prop.minor == 89)
-        {
+        if (device_prop.major*10 + device_prop.minor == 89) {
             return true;
         }
-            
     }
     catch(const std::exception& e)
     {
         std::cerr << e.what() << '\n';
+        return false;
     }
-    return false;
+    
 }
 
