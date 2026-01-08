@@ -23,6 +23,11 @@ public:
 
     virtual void ReleaseInferenceEngine() = 0;
     virtual ~InferenceApi() = default;
+protected:
+    //输入布局
+    std::vector<std::pair<std::string,std::vector<size_t>>> m_input_layouts;
+    //输出布局
+    std::vector<std::pair<std::string,std::vector<size_t>>> m_output_layouts;
 };
 
 

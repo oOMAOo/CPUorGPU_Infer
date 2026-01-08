@@ -47,7 +47,7 @@ ResultData<std::string> OpenVinoInfer::LoadModel(std::string file_path,
         return return_data;
     }
     
-    InferenceCommon::TryFunction([&](){
+    inference_common::TryFunction([&](){
         std::string model_path = file_path;
         if (file_path.find(".xml") == std::string::npos) {
             int idx = file_path.find_last_of('/');
@@ -79,13 +79,12 @@ ResultData<std::string> OpenVinoInfer::LoadModel(std::string file_path,
 }
 
 ResultData<bool> OpenVinoInfer::CreateEngine(std::string& engine_path){
-
     ResultData<bool> return_data;
     if (!m_model) {
         return_data.error_message = "<(E`_`E)> Please execute LoadModel() first, then createEngine().";
         return return_data;
     }
-    InferenceCommon::TryFunction([&](){
+    inference_common::TryFunction([&](){
         auto ppp = ov::preprocess::PrePostProcessor(m_model);
 
         //Input
@@ -174,13 +173,12 @@ ResultData<bool> OpenVinoInfer::CreateEngine(std::string& engine_path){
 
 
 bool OpenVinoInfer::Infer(const std::vector<std::vector<size_t>> &data_layouts,const std::vector<float*> &datas,std::vector<std::vector<float>> &output_datas){
-    
     ResultData<bool> return_data;
     if (!m_infer_request) {
         std::cout <<  "<(E`_`E)> Please execute CreateEngine() first" << std::endl;
         return false;
     }
-    InferenceCommon::TryFunction([&](){
+    inference_common::TryFunction([&](){
         for (int input_idx = 0; input_idx < data_layouts.size(); input_idx++)
         {
             ov::Tensor input_tensor(ov::element::f32, ov::Shape(data_layouts[input_idx]), datas[input_idx]);

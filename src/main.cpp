@@ -28,7 +28,7 @@ int main(){
 
     //使用CUDA函数检测是否存在NVIDIA设备且计算能力需要是8.9（后续再补全）  目前仅做简单检测
     //TODO 增加显卡版本检测
-    bool availableCUDA = InferenceCommon::GetAvailableCUDA();
+    bool availableCUDA = inference_common::GetAvailableCUDA();
     std::unique_ptr<CudaFun> cuda_tool = nullptr;
     if(availableCUDA){
         api_tool = new TensorRTInfer();
@@ -92,7 +92,7 @@ int main(){
     {
         float* out_data = output_datas[i].data();
         auto tran_start = std::chrono::steady_clock::now();
-        auto output_image_opt = cuda_tool ? cuda_tool->DatatoImage(&out_data,INPUT_H*INPUT_W*3,255.0f) : InferenceCommon::DatatoImage(&out_data,INPUT_H,INPUT_W,3,255.0f);
+        auto output_image_opt = cuda_tool ? cuda_tool->DatatoImage(&out_data,INPUT_H*INPUT_W*3,255.0f) : inference_common::DatatoImage(&out_data,INPUT_H,INPUT_W,3,255.0f);
         auto tran_end = std::chrono::steady_clock::now();
         double tran_time = std::chrono::duration<double, std::milli>(tran_end - tran_start).count();
         std::cout << std::format("----------------- transfor image used time : {} ms -----------------\n", tran_time);

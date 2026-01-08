@@ -1,7 +1,7 @@
 #include "inference_common.hpp"
 #include "cuda_fun.hpp"
 
-std::optional<cv::Mat> InferenceCommon::DatatoImage(float** data_p,int H,int W, int C,float scale){
+std::optional<cv::Mat> inference_common::DatatoImage(float** data_p,int H,int W, int C,float scale){
     try
     {
         cv::Mat output_image(H, W, CV_8UC3);
@@ -26,7 +26,7 @@ std::optional<cv::Mat> InferenceCommon::DatatoImage(float** data_p,int H,int W, 
     }
 }
 
-// std::optional<float**> InferenceCommon::Image2Data(cv::Mat image){
+// std::optional<float**> inference_common::Image2Data(cv::Mat image){
 //     try
 //     {
 //         #ifdef USE_CUDA
@@ -46,7 +46,7 @@ std::optional<cv::Mat> InferenceCommon::DatatoImage(float** data_p,int H,int W, 
 //     }
 // }
 
-bool InferenceCommon::GetAvailableCUDA()
+bool inference_common::GetAvailableCUDA()
 {
     try
     {

@@ -24,10 +24,7 @@ private:
     std::unique_ptr<nvinfer1::IExecutionContext> context;
     cudaStream_t stream;
     
-    //输入布局
-    std::vector<std::pair<std::string,std::vector<size_t>>> m_input_layouts;
-    //输出布局
-    std::vector<std::pair<std::string,std::vector<size_t>>> m_output_layouts;
+
 
     // GPU 输入buffer池
     float** gpu_input_buffers;

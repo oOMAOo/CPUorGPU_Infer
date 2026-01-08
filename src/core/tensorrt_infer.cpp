@@ -156,7 +156,7 @@ ResultData<std::string> TensorRTInfer::LoadModel(std::string file_path,
     std::vector<std::pair<std::string,std::vector<size_t>>>t_input_layouts,
     std::vector<std::pair<std::string,std::vector<size_t>>>t_output_layouts){
     ResultData<std::string> return_data;
-    InferenceCommon::TryFunction<std::string>([&](){
+    inference_common::TryFunction<std::string>([&](){
         m_input_layouts = t_input_layouts;
         m_output_layouts = t_output_layouts;
         if (file_path.find(".trt") == std::string::npos) {
@@ -222,7 +222,7 @@ void TensorRTInfer::DeserializeEngine(std::string& engine_name) {
 
 ResultData<bool> TensorRTInfer::CreateEngine(std::string& engine_path){
     ResultData<bool> return_data;
-    InferenceCommon::TryFunction<bool>([&](){
+    inference_common::TryFunction<bool>([&](){
         DeserializeEngine(engine_path);
         MY_ASSERT(
             m_input_layouts.size()+m_output_layouts.size() == engine->getNbIOTensors(),
@@ -282,7 +282,7 @@ ResultData<bool> TensorRTInfer::CreateEngine(std::string& engine_path){
 
 bool TensorRTInfer::Infer(const std::vector<std::vector<size_t>> &data_layouts,const std::vector<float*> &datas,std::vector<std::vector<float>> &output_datas){
     ResultData<bool> return_data;
-    InferenceCommon::TryFunction<bool>([&](){
+    inference_common::TryFunction<bool>([&](){
         MY_ASSERT(datas.size() == m_input_layouts.size(),"Please check the size() of your input data...");
         for (int input_idx = 0; input_idx < m_input_layouts.size(); input_idx++)
         {

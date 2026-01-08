@@ -12,10 +12,6 @@ private:
 
     //Intel 推理 驱动设备
     std::string m_device;
-    //输入布局
-    std::vector<std::pair<std::string,std::vector<size_t>>> m_input_layouts;
-    //输出布局
-    std::vector<std::pair<std::string,std::vector<size_t>>> m_output_layouts;
 
 public:
     OpenVinoInfer() = default;

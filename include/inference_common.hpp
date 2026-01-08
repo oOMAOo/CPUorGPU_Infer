@@ -19,7 +19,7 @@
         } \
     } while(false)
 
-namespace InferenceCommon
+namespace inference_common
 {
     template<typename T>
     inline void TryFunction(std::function<void(void)> func,ResultData<T> &state){
@@ -34,7 +34,7 @@ namespace InferenceCommon
         }
     }
     std::optional<cv::Mat> DatatoImage(float** data_p,int H,int W, int C,float scale);
-    // std::optional<float**> InferenceCommon::Image2Data(cv::Mat image);
+    // std::optional<float**> inference_common::Image2Data(cv::Mat image);
     bool GetAvailableCUDA();
 };
 

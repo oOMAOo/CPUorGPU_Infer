@@ -29,9 +29,9 @@ private:
 public:
     CudaFun(int H, int W, int C);
     std::optional<cv::Mat> DatatoImage(float** data_ptr, int data_size, float scale);
-    inline int GetHeight(){return m_height;};
-    inline int GetWidth(){return m_width;};
-    inline int GetChannel(){return m_channel;};
+    int GetHeight(){return m_height;};
+    int GetWidth(){return m_width;};
+    int GetChannel(){return m_channel;};
     ~CudaFun();
 
 };
