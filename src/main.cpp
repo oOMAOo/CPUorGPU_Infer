@@ -12,15 +12,18 @@
 #include "inference_api.hpp" 
 #include "openvino_infer.hpp"
 #include "tensorrt_infer.hpp"
+#include "onnxruntime_infer.hpp"
 #include "inference_common.hpp"
 
-#define INPUT_W 1050
-#define INPUT_H 1550
+#define INPUT_W 1024
+#define INPUT_H 1024
+//
+//1862.054ms
 int main(){
     std::string input_img = "C:\\Users\\影擎星图\\Desktop\\nafnet_demo\\CUDA-13.1.png";
     std::string model_path = "C:\\Users\\影擎星图\\Desktop\\nafnet_demo\\nafnet_ep304_20251117.onnx";
 
-    if(!std::filesystem::is_regular_file(std::filesystem::u8path(input_img)) || !std::filesystem::is_regular_file(std::filesystem::u8path(model_path))){
+    if(!std::filesystem::is_regular_file(std::filesystem::path(std::u8string(input_img.begin(),input_img.end()))) || !std::filesystem::is_regular_file(std::u8string(model_path.begin(),model_path.end()))){
         std::cerr << "<(E`_`E)> Model path/Image path is invalid, please check your path." << std::endl;;
         return -1;
     }
@@ -36,6 +39,7 @@ int main(){
     }else{
         api_tool = new OpenVinoInfer();
     }
+    api_tool = new OnnxRuntimeInfer();
 
     // ==================== 1. 创建基础推理引擎 ====================
     api_tool->CreateInferenceEngine();
@@ -53,7 +57,6 @@ int main(){
             return -1;
         }
     }
-
     // ==================== 2. 加载模型文件 ====================
     ResultData<std::string> load_state = api_tool->LoadModel(model_path,input_layouts,output_layouts);
     if(!load_state.result_state){
@@ -67,25 +70,37 @@ int main(){
 
     // ==================== 4. 准备输入数据 ====================
     std::vector<std::vector<float>> output_datas;
-    auto infer_start = std::chrono::steady_clock::now();
-    cv::Mat image = cv::imread(std::filesystem::u8path(input_img).string(), cv::IMREAD_COLOR_RGB);
+    cv::Mat image = cv::imread(std::filesystem::path(std::u8string(input_img.begin(),input_img.end())).string(), cv::IMREAD_COLOR_RGB);
     if (image.empty()) {
         std::cout << std::format("<(E`_`E)> Can't Open the image: {}\n", input_img);
         return -1;
     }
     std::cout << std::format("\n(I_I)>>>>> Input image size : {} x {}\n", INPUT_W, INPUT_H);
     cv::Mat blob = cv::dnn::blobFromImage(image, 1.0f/255.0f,cv::Size(INPUT_W,INPUT_H));
-    std::vector<std::vector<size_t>>data_layout;
-    data_layout.emplace_back(std::vector<size_t>{1,3,INPUT_H,INPUT_W});
-
+    
     // ==================== 5. 推理 ====================
-    bool output_state = api_tool->Infer(data_layout,{reinterpret_cast<float*>(blob.data)},output_datas);
-    if(!output_state){
-        return -1;
-    }
+
+    // 测试推理 200 次
+    // double min_time = std::numeric_limits<double>::max();
+    // for (size_t i = 0; i < 200; i++)
+    // {
+    //     auto start = std::chrono::steady_clock::now();
+    //     bool output_state = api_tool->Infer({reinterpret_cast<float*>(blob.data)},output_datas);
+    //     auto end = std::chrono::steady_clock::now();
+    //     double cost_time = std::chrono::duration<double,std::milli>(end - start).count();
+    //     min_time = std::min(min_time, cost_time);
+    //     if(!output_state){
+    //         return -1;
+    //     }
+    // }
+    // std::cout << std::format("----------------- Infer image used time : {} ms -----------------\n", min_time);
+
+    auto infer_start = std::chrono::steady_clock::now();
+    bool output_state = api_tool->Infer({reinterpret_cast<float*>(blob.data)},output_datas);
     auto infer_end = std::chrono::steady_clock::now();
     double infer_time = std::chrono::duration<double, std::milli>(infer_end - infer_start).count();
     std::cout << std::format("----------------- Infer image used time : {} ms -----------------\n", infer_time);
+    
 
     // ==================== 6. 整理结果 ====================
     for (int i = 0; i < output_datas.size(); i++)

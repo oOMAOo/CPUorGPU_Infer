@@ -39,12 +39,6 @@ public:
     /// @brief 获取当前推理引擎类型枚举
     /// @return _device_type::OpenVino
     const DEVICE_TYPE GetInferenceType() const override;
-    
-    /// @brief 获取输入层名称列表
-    ResultData<std::list<std::string>> GetInputNames() override;
-
-    /// @brief 获取输出层名称列表
-    ResultData<std::list<std::string>> GetOutputNames() override;
 
     /// @brief 使用onnx文件根据配置创建引擎
     /// @param layout  例 first:OpenVINO输入输出格式(NCHW\NHWC\NC?\NC...\N...C)    second:{1,3,224,224}(NCHW的话)
@@ -63,7 +57,7 @@ public:
     /// @param datas 输入数据
     /// @param output_datas 输入数据
     /// @return bool
-    bool Infer(const std::vector<std::vector<size_t>> &data_layouts,const std::vector<float*> &datas,std::vector<std::vector<float>> &output_datas)override;
+    bool Infer(const std::vector<float*> &datas,std::vector<std::vector<float>> &output_datas)override;
 
     /// @brief 释放资源
     void ReleaseInferenceEngine() override;

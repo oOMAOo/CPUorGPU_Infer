@@ -59,9 +59,9 @@ endif()
 
 
 # =============== CUDA （需根据安装自行替换路径） ===============
-set(CUDA_ROOT "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.0")
+set(CUDA_ROOT "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.8")
 set(CUDA_INCLUDE_DIR ${CUDA_ROOT}/include)
-set(CUDA_LIB_DIR ${CUDA_ROOT}/lib)
+set(CUDA_LIB_DIR ${CUDA_ROOT}/lib/x64)
 set(CUDA_BIN_DIR ${CUDA_ROOT}/bin/x64)
 list(APPEND IncludeDirs ${CUDA_INCLUDE_DIR})
 # Only Windows 64
@@ -102,14 +102,26 @@ else()
     message(Error: support AMD64 only, current processor: ${CMAKE_SYSTEM_PROCESSOR})
 endif()
 
+# ============================= OnnxRuntime =============================
+set(OnnxRuntime_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/dep/onnxruntime_gpu)
+set(OnnxRuntime_INCLUDE_DIR ${OnnxRuntime_ROOT}/include)
+set(OnnxRuntime_LIB_DIR ${OnnxRuntime_ROOT}/lib)
+set(OnnxRuntime_BIN_DIR ${OnnxRuntime_ROOT}/bin)
+list(APPEND IncludeDirs ${OnnxRuntime_INCLUDE_DIR})
+# Only Windows 64
+if(CMAKE_SYSTEM_PROCESSOR STREQUAL "AMD64" AND WIN32)
+    list(APPEND LibDirs ${OnnxRuntime_LIB_DIR})
+    list(APPEND BinDirs ${OnnxRuntime_BIN_DIR})
+else()
+    message(Error: support AMD64 only, current processor: ${CMAKE_SYSTEM_PROCESSOR})
+endif()
+
 # 查找文件
 file(GLOB CORE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/core/*.cpp")
 file(GLOB KERNELS_FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/kernels/*.cu")
 
 message(STATUS "Found Core files: ${CORE_FILES}")
 message(STATUS "Found KERNELS_FILES files: ${KERNELS_FILES}")
-
-
 
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include

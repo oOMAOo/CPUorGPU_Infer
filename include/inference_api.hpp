@@ -10,8 +10,6 @@ public:
     virtual void CreateInferenceEngine() = 0;
     //（0：OpenVino 1：TensorRT）
     virtual const DEVICE_TYPE GetInferenceType()  const = 0;
-    virtual ResultData<std::list<std::string>> GetInputNames() = 0;
-    virtual ResultData<std::list<std::string>> GetOutputNames() = 0;
 
     virtual ResultData<std::string> LoadModel(std::string file_path,
         std::vector<std::pair<std::string,std::vector<size_t>>>input_layouts,
@@ -19,7 +17,7 @@ public:
 
     virtual ResultData<bool> CreateEngine(std::string& engine_path) = 0;
 
-    virtual bool Infer(const std::vector<std::vector<size_t>> &data_layouts,const std::vector<float*> &datas,std::vector<std::vector<float>> &output_datas) = 0;
+    virtual bool Infer(const std::vector<float*> &datas,std::vector<std::vector<float>> &output_datas) = 0;
 
     virtual void ReleaseInferenceEngine() = 0;
     virtual ~InferenceApi() = default;

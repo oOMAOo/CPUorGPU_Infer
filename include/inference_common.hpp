@@ -5,7 +5,7 @@
 #include <optional>
 
 #include <opencv2/opencv.hpp>
-
+#include <onnxruntime_cxx_api.h>
 #include "inference_struct.h"
 
 
@@ -28,6 +28,11 @@ namespace inference_common
             func();
         }
         catch(const std::exception& e)
+        {
+            state.error_message = e.what();
+            std::cerr << state.error_message << std::endl;
+        }
+        catch(const Ort::Exception& e)
         {
             state.error_message = e.what();
             std::cerr << state.error_message << std::endl;

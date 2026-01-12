@@ -28,34 +28,6 @@ const DEVICE_TYPE TensorRTInfer::GetInferenceType() const{
     return DEVICE_TYPE::TensorRT;
 };
 
-ResultData<std::list<std::string>> TensorRTInfer::GetInputNames(){
-    ResultData<std::list<std::string>> return_data;
-    if (!engine) {
-        return_data.error_message = "<(E`_`E)> engine has not been cteated...";
-    }else{
-        for (int input_idx = 0; input_idx < m_input_layouts.size(); input_idx++)
-        {
-            const char* input_name = engine->getIOTensorName(input_idx);
-            return_data.result_info.push_back(input_name);
-        }
-        return_data.result_state = true;
-    }
-    return return_data;
-}
-ResultData<std::list<std::string>> TensorRTInfer::GetOutputNames(){
-    ResultData<std::list<std::string>> return_data;
-        if (!engine) {
-        return_data.error_message = "<(E`_`E)> engine has not been cteated...";
-    }else{
-        for (int input_idx = 0; input_idx < m_output_layouts.size(); input_idx++)
-        {
-            const char* input_name = engine->getIOTensorName(m_input_layouts.size() + input_idx);
-            return_data.result_info.push_back(input_name);
-        }
-        return_data.result_state = true;
-    }
-    return return_data;
-}
 
 bool TensorRTInfer::ConvertONNXToTensorRT(
     const std::string& onnx_path, const std::string& trt_engine_path, bool fp16_flag) {
@@ -70,7 +42,7 @@ bool TensorRTInfer::ConvertONNXToTensorRT(
     std::unique_ptr<nvonnxparser::IParser> parser(nvonnxparser::createParser(*network, logger));
     MY_ASSERT(parser,"Convert ONNX to TensorRT : Create onnx parser in error...");
     std::cout << "<(*^_^*)> builder |  network | parser is ready. Start building the engine." << std::endl;
-    if (!parser->parseFromFile(std::filesystem::u8path(onnx_path).string().c_str(), static_cast<int>(nvinfer1::ILogger::Severity::kWARNING))) {
+    if (!parser->parseFromFile(std::filesystem::path(std::u8string(onnx_path.begin(),onnx_path.end())).string().c_str(), static_cast<int>(nvinfer1::ILogger::Severity::kWARNING))) {
         std::cerr << "<(E`_`E)> Convert ONNX to TensorRT : Can't parser the ONNX file" << onnx_path << std::endl;
         for (int i = 0; i < parser->getNbErrors(); ++i) {
             std::cerr << "    " << parser->getError(i)->desc() << std::endl;
@@ -161,12 +133,12 @@ ResultData<std::string> TensorRTInfer::LoadModel(std::string file_path,
         m_output_layouts = t_output_layouts;
         if (file_path.find(".trt") == std::string::npos) {
             std::string onnx_file_path = file_path;
-            int idx = file_path.find_last_of('/');
+            int idx = static_cast<int>(file_path.find_last_of('/'));
             if (idx != std::string::npos) {
                 idx+=1;
                 file_path = file_path.substr(idx,file_path.size()-idx);
             }
-            int idx_1 = file_path.find_last_of('\\');
+            int idx_1 = static_cast<int>(file_path.find_last_of('\\'));
             if (idx_1 != std::string::npos) {
                 idx_1+=1;
                 file_path = file_path.substr(idx_1,file_path.size()-idx_1);
@@ -192,19 +164,14 @@ ResultData<std::string> TensorRTInfer::LoadModel(std::string file_path,
 std::vector<unsigned char> TensorRTInfer::LoadEngineFile(const std::string& file_name)
 {
     std::vector<unsigned char> engine_data;
-    std::ifstream engine_file(std::filesystem::u8path(file_name), std::ios::binary);
+    std::ifstream engine_file(std::filesystem::path(std::u8string(file_name.begin(),file_name.end())), std::ios::binary);
     if (!engine_file.is_open()) {
         MY_ASSERT(false, std::string("engine file :") + file_name + " can't open()...");
     }
-    //句柄移动到末尾
     engine_file.seekg(0, engine_file.end);
-    //询问位置得到整体length
-    int length = engine_file.tellg();
-    //分配vector空间
+    int length = static_cast<int>(engine_file.tellg());
     engine_data.resize(length);
-    //句柄回到开始
     engine_file.seekg(0, engine_file.beg);
-    //读取全部数据到 engine_data uchar*到char*要强转
     engine_file.read(reinterpret_cast<char*>(engine_data.data()), length);
     return engine_data;
 }
@@ -261,7 +228,7 @@ ResultData<bool> TensorRTInfer::CreateEngine(std::string& engine_path){
         for (int output_idx = 0; output_idx < m_output_layouts.size(); output_idx++) {
             int size_num = accumulate(m_output_layouts[output_idx].second.begin(), m_output_layouts[output_idx].second.end(), 1, std::multiplies<int>());
             CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&gpu_output_buffers[output_idx]), size_num * sizeof(float)));
-            int real_idx = m_input_layouts.size() + output_idx;
+            int real_idx = static_cast<int>(m_input_layouts.size()) + output_idx;
             const char* output_name = engine->getIOTensorName(real_idx);
             bool state = context->setOutputTensorAddress(output_name, gpu_output_buffers[output_idx]);
             if (state) {
@@ -280,7 +247,7 @@ ResultData<bool> TensorRTInfer::CreateEngine(std::string& engine_path){
     
 }
 
-bool TensorRTInfer::Infer(const std::vector<std::vector<size_t>> &data_layouts,const std::vector<float*> &datas,std::vector<std::vector<float>> &output_datas){
+bool TensorRTInfer::Infer(const std::vector<float*> &datas,std::vector<std::vector<float>> &output_datas){
     ResultData<bool> return_data;
     inference_common::TryFunction<bool>([&](){
         MY_ASSERT(datas.size() == m_input_layouts.size(),"Please check the size() of your input data...");
@@ -291,6 +258,7 @@ bool TensorRTInfer::Infer(const std::vector<std::vector<size_t>> &data_layouts,c
             CUDA_CHECK(cudaMemcpyAsync(gpu_input_buffers[input_idx], datas[input_idx], size_num * sizeof(float), cudaMemcpyHostToDevice, stream));
             std::cout << std::format("    GPU input buffer [{}/{}] is ready.\n",input_idx+1,m_input_layouts.size());
         }
+        
         if (!context->enqueueV3(stream)) {
             return_data.error_message = "<(E`_`E)> Error: Inference run failed!";
             return;

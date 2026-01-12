@@ -5,7 +5,8 @@
 
 enum DEVICE_TYPE{
     OpenVino = 0,
-    TensorRT = 1
+    TensorRT = 1,
+    OnnxRuntime = 2
 };
 
 template<typename T>

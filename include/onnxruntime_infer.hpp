@@ -1,20 +1,10 @@
 #pragma once
-#include "inference_api.hpp"
-#include <openvino/openvino.hpp>
-
-class OpenVinoInfer:public InferenceApi
+#include <inference_api.hpp>
+#include <onnxruntime_cxx_api.h>
+class OnnxRuntimeInfer : public InferenceApi
 {
-private:
-    std::unique_ptr<ov::Core> m_core;
-    std::shared_ptr<ov::Model> m_model;
-    std::unique_ptr<ov::CompiledModel> m_compiled_model;
-    std::unique_ptr<ov::InferRequest> m_infer_request;
-
-    //Intel 推理 驱动设备
-    std::string m_device;
-
 public:
-    OpenVinoInfer() = default;
+    OnnxRuntimeInfer() = default;
 
     /// @brief 初始化当前推理配置
     void CreateInferenceEngine() override;
@@ -30,13 +20,6 @@ public:
     ResultData<std::string> LoadModel(std::string file_path,
         std::vector<std::pair<std::string,std::vector<size_t>>>t_input_layouts,
         std::vector<std::pair<std::string,std::vector<size_t>>>t_output_layouts) override;
-
-    /// @brief 使用xml文件根据配置创建引擎
-    /// @param layout  例 first:OpenVINO输入输出格式(NCHW\NHWC\NC?\NC...\N...C)    second:{1,3,224,224}(NCHW的话)
-    /// @return 引擎文件路径
-    ResultData<std::string> LoadModel_IR(std::string file_path,
-        std::vector<std::pair<std::string,std::vector<size_t>>>t_input_layouts,
-        std::vector<std::pair<std::string,std::vector<size_t>>>t_output_layouts);
     
     /// @brief 使用引擎文件初始化识别引擎 设置输入输出配置(OpenVino引擎在LoadModel已初始化过)
     /// @param engine_path 引擎文件路径
@@ -53,7 +36,11 @@ public:
     /// @brief 释放资源
     void ReleaseInferenceEngine() override;
 
-    ~OpenVinoInfer() override {ReleaseInferenceEngine();}
+    ~OnnxRuntimeInfer() override {ReleaseInferenceEngine();}
+private:
+    std::unique_ptr<Ort::Env> env;
+    std::unique_ptr<Ort::SessionOptions> session_options;
+    std::unique_ptr<Ort::Session> session;
+    std::unique_ptr<Ort::MemoryInfo> mem_info;
 };
-
 

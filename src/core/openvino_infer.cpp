@@ -30,6 +30,7 @@ void OpenVinoInfer::CreateInferenceEngine(){
     }
     //设置openvino缓存路径 存储插件缓存数据
     m_core->set_property(m_device, ov::cache_dir("OpenVinoCache_" + m_device));
+    std::cout << ov::get_openvino_version() << std::endl;
     std::cout << std::format("<(*^_^*)> OpenVino[{}] Inference Created Successfully\n", m_device);
 };
 
@@ -78,6 +79,34 @@ ResultData<std::string> OpenVinoInfer::LoadModel(std::string file_path,
     return return_data;
 }
 
+ResultData<std::string> OpenVinoInfer::LoadModel_IR(std::string file_path,
+                                        std::vector<std::pair<std::string,std::vector<size_t>>>t_input_layouts,
+                                        std::vector<std::pair<std::string,std::vector<size_t>>>t_output_layouts){
+    //记录输入输出形状
+    m_input_layouts = t_input_layouts;
+    m_output_layouts = t_output_layouts;
+
+    ResultData<std::string> return_data;
+    if (!m_core) {
+        return_data.error_message = "<(E`_`E)> ov::Core is NULL, please execute CreateInferenceEngine().";
+        return return_data;
+    }
+    
+    inference_common::TryFunction([&](){
+        std::string model_path = file_path;
+        if (file_path.find(".xml") == std::string::npos) {
+            return_data.error_message = "<(E`_`E)> The file_path must point to an OpenVINO IR '.xml' file";
+            return return_data;
+        }
+        m_model = m_core->read_model(model_path);
+        std::cout << "<(*^_^*)> Inference model (OpenVino) has been created successfully."<< std::endl;
+        return return_data;
+    },return_data);
+    if (return_data.error_message.empty())
+        return_data.result_state = true;
+    return return_data;
+}
+
 ResultData<bool> OpenVinoInfer::CreateEngine(std::string& engine_path){
     ResultData<bool> return_data;
     if (!m_model) {
@@ -116,12 +145,13 @@ ResultData<bool> OpenVinoInfer::CreateEngine(std::string& engine_path){
             }
             std::cout << "   LayOut:" << input_layout.first << std::endl;
             ov::PartialShape input_shape = ov::PartialShape(input_dims);
-            ppp.input(input_idx).tensor()
-                .set_element_type(ov::element::Type_t::f32)
-                .set_layout(ov::Layout(input_layout.first)) // OpenVINO输入格式(NCHW\NHWC\NC?\NC...\N...C)
-                .set_shape(input_shape); 
+            //Tensor
+            ppp.input(input_idx).tensor().
+                set_element_type(ov::element::Type_t::f32).
+                set_layout(ov::Layout(input_layout.first)). // OpenVINO输入格式(NCHW\NHWC\NC?\NC...\N...C)
+                set_shape(input_shape); 
             std::cout << "<(*^_^*)> Input tensor has been setted on element_type/layout/shape."<< std::endl;
-
+            //Model
             ppp.input(input_idx).model().set_layout(ov::Layout(input_layout.first));
             std::cout << "<(*^_^*)> Input model has been setted on layout."<< std::endl;;
         }
@@ -156,7 +186,9 @@ ResultData<bool> OpenVinoInfer::CreateEngine(std::string& engine_path){
             }
             std::cout << "   LayOut:" << output_layout.first << std::endl;;
             ov::PartialShape output_shape = ov::PartialShape(output_dims);
-            ppp.output(output_idx).tensor().set_element_type(ov::element::Type_t::f32).set_layout(ov::Layout(output_layout.first));
+            ppp.output(output_idx).tensor().
+                set_element_type(ov::element::Type_t::f32).
+                set_layout(ov::Layout(output_layout.first));
             std::cout << "<(*^_^*)> Output tensor has been setted on element_type/layout."<< std::endl;;
         }
         m_model = ppp.build();
@@ -172,16 +204,16 @@ ResultData<bool> OpenVinoInfer::CreateEngine(std::string& engine_path){
 }
 
 
-bool OpenVinoInfer::Infer(const std::vector<std::vector<size_t>> &data_layouts,const std::vector<float*> &datas,std::vector<std::vector<float>> &output_datas){
+bool OpenVinoInfer::Infer(const std::vector<float*> &datas,std::vector<std::vector<float>> &output_datas){
     ResultData<bool> return_data;
     if (!m_infer_request) {
         std::cout <<  "<(E`_`E)> Please execute CreateEngine() first" << std::endl;
         return false;
     }
     inference_common::TryFunction([&](){
-        for (int input_idx = 0; input_idx < data_layouts.size(); input_idx++)
+        for (int input_idx = 0; input_idx < m_input_layouts.size(); input_idx++)
         {
-            ov::Tensor input_tensor(ov::element::f32, ov::Shape(data_layouts[input_idx]), datas[input_idx]);
+            ov::Tensor input_tensor(ov::element::f32, ov::Shape(m_input_layouts[input_idx].second), datas[input_idx]);
             m_infer_request->set_input_tensor(input_idx,input_tensor);
         }
         m_infer_request->infer();
@@ -206,29 +238,6 @@ bool OpenVinoInfer::Infer(const std::vector<std::vector<size_t>> &data_layouts,c
         return_data.result_state = true;
     }
     return return_data.result_state;
-}
-
-ResultData<std::list<std::string>> OpenVinoInfer::GetInputNames(){
-    ResultData<std::list<std::string>> return_data;
-    return_data.result_info = std::list<std::string>();
-    if (m_model) {
-        for (int i = 0; i < m_model->inputs().size(); i++)
-        {
-            return_data.result_info.push_back(m_model->inputs()[i].get_any_name());
-        }
-    }
-
-}
-
-ResultData<std::list<std::string>> OpenVinoInfer::GetOutputNames(){
-        ResultData<std::list<std::string>> return_data;
-    return_data.result_info = std::list<std::string>();
-    if (m_model) {
-        for (int i = 0; i < m_model->outputs().size(); i++)
-        {
-            return_data.result_info.push_back(m_model->outputs()[i].get_any_name());
-        }
-    }
 }
 
 void OpenVinoInfer::ReleaseInferenceEngine(){
