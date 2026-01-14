@@ -134,6 +134,9 @@ int main(){
             std::cerr << "DatatoImage Error" << std::endl;
         }
     }
+    delete[] input1;
+    delete[] input2;
+    delete[] input3;
     output_datas.clear();
     output_datas.shrink_to_fit();
 
