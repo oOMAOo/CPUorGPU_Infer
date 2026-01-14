@@ -15,13 +15,13 @@
 #include "onnxruntime_infer.hpp"
 #include "inference_common.hpp"
 
-#define INPUT_W 1024
-#define INPUT_H 1024
+#define INPUT_W 512
+#define INPUT_H 512
 //
 //1862.054ms
 int main(){
     std::string input_img = "C:\\Users\\影擎星图\\Desktop\\nafnet_demo\\CUDA-13.1.png";
-    std::string model_path = "C:\\Users\\影擎星图\\Desktop\\nafnet_demo\\nafnet_ep304_20251117.onnx";
+    std::string model_path = "C:\\Users\\影擎星图\\Desktop\\nafnet_demo\\warping_spade1.onnx";
 
     if(!std::filesystem::is_regular_file(std::filesystem::path(std::u8string(input_img.begin(),input_img.end()))) || !std::filesystem::is_regular_file(std::u8string(model_path.begin(),model_path.end()))){
         std::cerr << "<(E`_`E)> Model path/Image path is invalid, please check your path." << std::endl;;
@@ -39,15 +39,17 @@ int main(){
     }else{
         api_tool = new OpenVinoInfer();
     }
-    api_tool = new OnnxRuntimeInfer();
+    // api_tool = new OnnxRuntimeInfer();
 
     // ==================== 1. 创建基础推理引擎 ====================
     api_tool->CreateInferenceEngine();
 
-    
     using LayoutShape = std::pair<std::string,std::vector<size_t>>;
     std::vector<LayoutShape> input_layouts;
-    input_layouts.emplace_back(LayoutShape{"NCHW", {1,3,INPUT_H,INPUT_W}});
+    input_layouts.emplace_back(LayoutShape{"NCHW", {1,32,16,64,64}});
+    input_layouts.emplace_back(LayoutShape{"NCHW", {1,21,3}});
+    input_layouts.emplace_back(LayoutShape{"NCHW", {1,21,3}});
+
     std::vector<LayoutShape> output_layouts;
     output_layouts.emplace_back(LayoutShape{"NCHW", {1,3,INPUT_H,INPUT_W}});
     if (!std::filesystem::exists(MODELPATH))
@@ -77,6 +79,12 @@ int main(){
     }
     std::cout << std::format("\n(I_I)>>>>> Input image size : {} x {}\n", INPUT_W, INPUT_H);
     cv::Mat blob = cv::dnn::blobFromImage(image, 1.0f/255.0f,cv::Size(INPUT_W,INPUT_H));
+
+    // 测试数据
+    float *input1 = new float[1*32*16*64*64];
+    float *input2 = new float[1*21*3];
+    float *input3 = new float[1*21*3];
+    const std::vector<float*> input_datas{input1,input2,input3};
     
     // ==================== 5. 推理 ====================
 
@@ -96,7 +104,8 @@ int main(){
     // std::cout << std::format("----------------- Infer image used time : {} ms -----------------\n", min_time);
 
     auto infer_start = std::chrono::steady_clock::now();
-    bool output_state = api_tool->Infer({reinterpret_cast<float*>(blob.data)},output_datas);
+    // bool output_state = api_tool->Infer({reinterpret_cast<float*>(blob.data)},output_datas);
+    bool output_state = api_tool->Infer(input_datas,output_datas);
     auto infer_end = std::chrono::steady_clock::now();
     double infer_time = std::chrono::duration<double, std::milli>(infer_end - infer_start).count();
     std::cout << std::format("----------------- Infer image used time : {} ms -----------------\n", infer_time);

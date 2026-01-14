@@ -16,6 +16,7 @@ if(CMAKE_CUDA_COMPILER)
     message(Use Cuda: ${CMAKE_CUDA_COMPILER})
     set(USE_CUDA ON)
     enable_language(CUDA)
+    
 else()
     #失败退出
     message(FATAL_ERROR Can't\ Find\ Cuda ...)
@@ -26,8 +27,8 @@ endif()
 if(MSVC)
     # 通用编译选项
     add_compile_options(
-        $<$<COMPILE_LANGUAGE:CXX>:/Zc:__cplusplus>      # 正确的 __cplusplus 宏
-        $<$<COMPILE_LANGUAGE:CXX>:/std:c++20>      # 正确的 __cplusplus 宏
+        $<$<COMPILE_LANGUAGE:CXX>:/Zc:__cplusplus>      # cplusplus
+        $<$<COMPILE_LANGUAGE:CXX>:/std:c++20>           # c++20
         $<$<COMPILE_LANGUAGE:CXX>:/W3>                  # 警告级别4
         $<$<COMPILE_LANGUAGE:CXX>:/Zc:inline>           # 移除未使用的函数
         $<$<COMPILE_LANGUAGE:CXX>:/MP>                  # 多处理器编译
@@ -60,8 +61,8 @@ endif()
 
 # =============== CUDA （需根据安装自行替换路径） ===============
 set(CUDA_ROOT "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.8")
-set(CUDA_INCLUDE_DIR ${CUDA_ROOT}/include)
-set(CUDA_LIB_DIR ${CUDA_ROOT}/lib/x64)
+set(CUDA_INCLUDE_DIR ${CUDA_ROOT}/include CACHE STRING "cuda include dir")
+set(CUDA_LIB_DIR ${CUDA_ROOT}/lib/x64 CACHE STRING "cuda lib dir")
 set(CUDA_BIN_DIR ${CUDA_ROOT}/bin/x64)
 list(APPEND IncludeDirs ${CUDA_INCLUDE_DIR})
 # Only Windows 64
@@ -71,16 +72,19 @@ if(CMAKE_SYSTEM_PROCESSOR STREQUAL "AMD64" AND WIN32)
 endif()
 # ========================== TensorRT ==========================
 set(TensorRT_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/dep/tensorrt)
-set(TensorRT_INCLUDE_DIR ${TensorRT_ROOT}/include)
-set(TensorRT_LIB_DIR ${TensorRT_ROOT}/lib)
+set(TensorRT_INCLUDE_DIR ${TensorRT_ROOT}/include CACHE STRING "tensorRT include dir")
+set(TensorRT_LIB_DIR ${TensorRT_ROOT}/lib CACHE STRING "tensorRT include dir")
 set(TensorRT_BIN_DIR ${TensorRT_ROOT}/bin)
 list(APPEND IncludeDirs ${TensorRT_INCLUDE_DIR})
 # Only Windows 64
 if(CMAKE_SYSTEM_PROCESSOR STREQUAL "AMD64" AND WIN32)
     list(APPEND LibDirs ${TensorRT_LIB_DIR})
     list(APPEND BinDirs ${TensorRT_BIN_DIR})
+# 添加插件
+add_subdirectory(plugins)
 endif()
  
+message("=================================================================${CMAKE_BUILD_TYPE}")
 # ============================= OpenVINO =============================
 set(OpenVINO_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/dep/openvino)
 set(OpenVINO_INCLUDE_DIR ${OpenVINO_ROOT}/include)
@@ -123,29 +127,32 @@ file(GLOB KERNELS_FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/kernels/*.cu")
 message(STATUS "Found Core files: ${CORE_FILES}")
 message(STATUS "Found KERNELS_FILES files: ${KERNELS_FILES}")
 
-include_directories(
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${IncludeDirs}
-)
-message("\n----------- INCLUDE -------------\n" ${IncludeDirs})
-message("\n----------- LIBRARY ----------\n" ${LibDirs})
-# 添加lib目录
-link_directories(
-    ${LibDirs}
-)
 # 添加可执行文件
 add_executable(${PROJECT_NAME}
     src/main.cpp
     ${KERNELS_FILES}
     ${CORE_FILES}
-    
+)
+
+target_include_directories(${PROJECT_NAME} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/plugins/addgridsamplePlugin
+    ${IncludeDirs}
+)
+message("\n----------- INCLUDE -------------\n" ${IncludeDirs})
+message("\n----------- LIBRARY ----------\n" ${LibDirs})
+
+
+# 添加lib目录
+target_link_directories(${PROJECT_NAME} PRIVATE
+    ${LibDirs}
 )
 foreach(libdir ${LibDirs})
     message(Add lib Dir:${libdir})
     file(GLOB libs "${libdir}/*.lib")
     target_link_libraries(${PROJECT_NAME} PRIVATE ${libs})
 endforeach()
-
+target_link_libraries(${PROJECT_NAME} PRIVATE trt_plugins)
 foreach(bindir ${BinDirs})
     message(Add Bin Dir:${bindir})
     file(GLOB dlls "${bindir}/*")

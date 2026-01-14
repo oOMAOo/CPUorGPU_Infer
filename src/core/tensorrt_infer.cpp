@@ -6,7 +6,7 @@
 #include <NvOnnxParser.h>
 #include "inference_common.hpp"
 #include "cuda_fun.hpp"
-
+#include "addgridsampleplugin.hpp"
 class Logger : public nvinfer1::ILogger {
 public:
     void log(Severity severity, const char* msg) noexcept override {
@@ -28,13 +28,15 @@ const DEVICE_TYPE TensorRTInfer::GetInferenceType() const{
     return DEVICE_TYPE::TensorRT;
 };
 
-
 bool TensorRTInfer::ConvertONNXToTensorRT(
     const std::string& onnx_path, const std::string& trt_engine_path, bool fp16_flag) {
     Logger logger;
     std::unique_ptr<nvinfer1::IBuilder> builder(nvinfer1::createInferBuilder(logger));
     MY_ASSERT(builder,"Convert ONNX to TensorRT : Create builder in error..." );
-
+    // initLibNvInferPlugins(&logger, "");
+    nvinfer1::plugin::AddGridSamplePluginCreator* addGridSampleCreator = new nvinfer1::plugin::AddGridSamplePluginCreator();
+    auto* pluginRegistry = getPluginRegistry();
+    pluginRegistry->registerCreator(*addGridSampleCreator, "MyGridSample");
     const auto explicit_batch = 1U << static_cast<uint32_t>(nvinfer1::NetworkDefinitionCreationFlag::kEXPLICIT_BATCH);
     std::unique_ptr<nvinfer1::INetworkDefinition> network(builder->createNetworkV2(explicit_batch));
     MY_ASSERT(network,"Convert ONNX to TensorRT : Create network in error...");
@@ -52,6 +54,21 @@ bool TensorRTInfer::ConvertONNXToTensorRT(
 
     // 创建构建配置
     std::unique_ptr<nvinfer1::IBuilderConfig> config(builder->createBuilderConfig());
+
+    //测试demo
+    // {
+    //     std::unique_ptr<nvinfer1::IHostMemory> ser_model(builder->buildSerializedNetwork(*network, *config));
+    //     // 保存引擎文件
+    //     std::ofstream ser_engine_file(trt_engine_path, std::ios::binary);
+    //     MY_ASSERT(ser_engine_file.is_open(),std::string("can't create trt file: ") + trt_engine_path);
+    //     std::cout << "    Save model path: " << trt_engine_path << std::endl;
+    //     ser_engine_file.write(static_cast<const char*>(ser_model->data()), ser_model->size());
+    //     ser_engine_file.close();
+
+    //     std::cout << "<(*^_^*)> Inference model (TensorRT) has been loaded successfully." << std::endl;
+    //     return false;
+    // }
+
     MY_ASSERT(config,"Convert ONNX to TensorRT : Create builder config in error...");
     if (fp16_flag && builder->platformHasFastFp16()) {
         config->setFlag(nvinfer1::BuilderFlag::kFP16);
@@ -60,10 +77,12 @@ bool TensorRTInfer::ConvertONNXToTensorRT(
     else if (fp16_flag) {
         std::cout << "   Your GPU don't support FP16 model..." << std::endl;
     }
+    MY_ASSERT(network->getNbInputs() == m_input_layouts.size(),"network NbInputs!=shapes.size()");
+
+    bool static_shape_flag = false;
+    
     nvinfer1::IOptimizationProfile* profile = builder->createOptimizationProfile();
     MY_ASSERT(profile,"Convert ONNX to TensorRT : Create profile in error...");
-    MY_ASSERT(network->getNbInputs() == m_input_layouts.size(),"network NbInputs!=shapes.size()");
-   
     for (int input_idx = 0; input_idx < network->getNbInputs(); input_idx++)
     {
         auto shape = m_input_layouts[input_idx].second;
@@ -74,6 +93,7 @@ bool TensorRTInfer::ConvertONNXToTensorRT(
         std::cout << "<(*^_^*)> Model input "<< std::to_string(input_idx) <<" Shape: ";
         for (int i = 0; i < opt_dims.nbDims; i++)
         {
+            static_shape_flag &= (opt_dims.d[i] > 0);
             std::cout << opt_dims.d[i] << (i != opt_dims.nbDims - 1 ? " x " : "");
         }
         std::cout << "   VS    Your input Shape: ";
@@ -82,7 +102,9 @@ bool TensorRTInfer::ConvertONNXToTensorRT(
             std::cout << shape[i] << (i != shape.size() - 1 ? " x " : "");
         }
         std::cout << "   LayOut:" << m_input_layouts[input_idx].first << std::endl;
-
+        //非动态形状直接跳过
+        if(static_shape_flag) 
+            continue;
         for (int i = 0; i < opt_dims.nbDims; ++i) {
             if (i < static_cast<int>(shape.size())) {
                 min_dims.d[i] = shape[i];
@@ -105,9 +127,6 @@ bool TensorRTInfer::ConvertONNXToTensorRT(
         }
         std::cout << std::endl;
     }
-
-    config->setBuilderOptimizationLevel(5);
-
     // 构建引擎
     std::unique_ptr<nvinfer1::IHostMemory> serialized_model(builder->buildSerializedNetwork(*network, *config));
     MY_ASSERT(serialized_model,"Can't serialized the Network.");
@@ -122,7 +141,6 @@ bool TensorRTInfer::ConvertONNXToTensorRT(
     std::cout << "<(*^_^*)> Inference model (TensorRT) has been loaded successfully." << std::endl;
     return true;
 }
-
 
 ResultData<std::string> TensorRTInfer::LoadModel(std::string file_path,
     std::vector<std::pair<std::string,std::vector<size_t>>>t_input_layouts,
@@ -155,8 +173,9 @@ ResultData<std::string> TensorRTInfer::LoadModel(std::string file_path,
     },return_data);
     if (return_data.error_message.empty()) {
         return_data.result_state = true;
+        std::cout << "<(*^_^*)> LoadModel(...) Successfully" << std::endl;
     }
-    std::cout << "<(*^_^*)> LoadModel(...) Successfully" << std::endl;
+    
     return return_data;
     
 }
@@ -212,18 +231,25 @@ ResultData<bool> TensorRTInfer::CreateEngine(std::string& engine_path){
             }
             nvinfer1::Dims dims = engine->getTensorShape(input_name);
             MY_ASSERT(dims.nbDims == m_input_layouts[input_idx].second.size(),"Input node: " + input_name + ":Please check your input_layout dims");
+            //默认不需要设置形状
+            bool static_shape_flag = true;
             for (int i = 0; i < dims.nbDims; i++)
-            {
+            {   
+                static_shape_flag &= (dims.d[i] > 0);
                 MY_ASSERT((dims.d[i]<=0 || dims.d[i] == m_input_layouts[input_idx].second[i]),"Model input size mismatch. Please delete the TRT engine file and rebuild.");
                 dims.d[i] = m_input_layouts[input_idx].second[i];
             }
-            state = context->setInputShape(input_name, dims);
-            if (state) {
-            std::cout << std::format("    Input node [name:{}] has bind its shape.\n",input_name);
-            }else{
-                return_data.error_message = std::format("<(E`_`E)> Input node [name:{}] can't bind its shape.\n",input_name);
-                return;
+            //模型使用动态形状 需要设置形状
+            if(!static_shape_flag){
+                state = context->setInputShape(input_name, dims);
+                if (state) {
+                std::cout << std::format("    Input node [name:{}] has bind its shape.\n",input_name);
+                }else{
+                    return_data.error_message = std::format("<(E`_`E)> Input node [name:{}] can't bind its shape.\n",input_name);
+                    return;
+                }
             }
+
         }
         for (int output_idx = 0; output_idx < m_output_layouts.size(); output_idx++) {
             int size_num = accumulate(m_output_layouts[output_idx].second.begin(), m_output_layouts[output_idx].second.end(), 1, std::multiplies<int>());
@@ -278,8 +304,9 @@ bool TensorRTInfer::Infer(const std::vector<float*> &datas,std::vector<std::vect
     },return_data);
     if (return_data.error_message.empty()) {
         return_data.result_state = true;
+        std::cout << "<(*^_^*)> Infer(...) Successfully" << std::endl;
     }
-    std::cout << "<(*^_^*)> Infer(...) Successfully" << std::endl;
+    
     return return_data.result_state;
 
 }
