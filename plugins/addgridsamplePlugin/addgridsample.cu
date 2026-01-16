@@ -141,6 +141,7 @@ __global__ void grid_sample_3d_bilinear_kernel(
         return;
     }
 
+    // NDHW3 grid
     auto n = tid / (D_grid * H_grid * W_grid);
     auto d = (tid / (H_grid * W_grid)) % D_grid;
     auto h = (tid / W_grid) % H_grid;
@@ -151,6 +152,7 @@ __global__ void grid_sample_3d_bilinear_kernel(
     scalar_t* output_N_offset = output + n * output_stride_N;
 
     const scalar_t* grid_NDHW_offset = grid_N_offset + d * grid_stride_D + h * grid_stride_H + w * grid_stride_W;
+    //获取grid坐标值
     const scalar_t x = *grid_NDHW_offset;
     const scalar_t y = *(grid_NDHW_offset + grid_stride_XYZ);
     const scalar_t z = *(grid_NDHW_offset + 2 * grid_stride_XYZ);

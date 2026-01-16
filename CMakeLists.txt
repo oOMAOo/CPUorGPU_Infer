@@ -57,7 +57,8 @@ if(CMAKE_SYSTEM_PROCESSOR STREQUAL "AMD64" AND WIN32)
     list(APPEND BinDirs ${OpenCV_BIN_DIR})
 endif()
 
-
+# ========================== Eigen ========================== 
+list(APPEND IncludeDirs ${CMAKE_CURRENT_SOURCE_DIR}/dep)
 
 # =============== CUDA （需根据安装自行替换路径） ===============
 set(CUDA_ROOT "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.8")
@@ -129,7 +130,7 @@ message(STATUS "Found KERNELS_FILES files: ${KERNELS_FILES}")
 
 # 添加可执行文件
 add_executable(${PROJECT_NAME}
-    src/main.cpp
+    src/main_split_model.cpp
     ${KERNELS_FILES}
     ${CORE_FILES}
 )

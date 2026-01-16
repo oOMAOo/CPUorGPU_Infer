@@ -23,9 +23,6 @@ private:
     std::unique_ptr<nvinfer1::ICudaEngine> engine;
     std::unique_ptr<nvinfer1::IExecutionContext> context;
     cudaStream_t stream;
-    
-
-
     // GPU 输入buffer池
     float** gpu_input_buffers;
     // GPU 输出buffer池

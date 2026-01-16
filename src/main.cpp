@@ -81,9 +81,9 @@ int main(){
     cv::Mat blob = cv::dnn::blobFromImage(image, 1.0f/255.0f,cv::Size(INPUT_W,INPUT_H));
 
     // 测试数据
-    float *input1 = new float[1*32*16*64*64];
-    float *input2 = new float[1*21*3];
-    float *input3 = new float[1*21*3];
+    float *input1 = new float[1*32*16*64*64]{0};
+    float *input2 = new float[1*21*3]{0};
+    float *input3 = new float[1*21*3]{0};
     const std::vector<float*> input_datas{input1,input2,input3};
     
     // ==================== 5. 推理 ====================
