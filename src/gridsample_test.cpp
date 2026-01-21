@@ -35,9 +35,9 @@ inline vector<float> readDataFromFile(const char* file_path){
 
 int main(){
     
-    string grid(".\\shape4.txt");
-    string input(".\\shape3.txt");
-    string output(".\\out.txt");
+    string grid("..\\data\\grid.txt");
+    string input("..\\data\\input.txt");
+    string output("..\\data\\output.txt");
     vector<float> input_data = readDataFromFile(input.c_str());
     vector<float> grid_data = readDataFromFile(grid.c_str());
     vector<float> output_data = readDataFromFile(output.c_str());
