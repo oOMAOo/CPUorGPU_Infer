@@ -1,6 +1,8 @@
 #pragma once
 #include <string>
+#include <iostream>
 #include <vector>
+#include <cassert>
 namespace InferMath{
 
     struct Tensor3D {
@@ -15,11 +17,10 @@ namespace InferMath{
             return false;
         }
         bool setData(float* t_data_ptr,size_t size){
-            if(size == data.size()){
-                memcpy(data.data(),t_data_ptr,size);
-                return true;
-            }
-            return false;
+            assert(size == data.size());
+            errno_t code =memcpy_s(data.data(),size*sizeof(float),t_data_ptr,size*sizeof(float));
+            assert(code == 0);
+            return true;
         }
         float& at(int n, int c, int d, int h, int w) {
             return data[((n * C + c) * D + d) * H * W + h * W + w];
@@ -29,6 +30,9 @@ namespace InferMath{
         }
         float* ptr(){
             return data.data();
+        }
+        size_t size(){
+            return data.size();
         }
     private:
         // 数据在这里
@@ -48,14 +52,18 @@ namespace InferMath{
             return false;
         }
         bool setData(float* t_data_ptr,size_t size){
-            if(size == data.size()){
-                memcpy(data.data(),t_data_ptr,size);
-                return true;
-            }
-            return false;
+            assert(size == data.size());
+            errno_t code =memcpy_s(data.data(),size*sizeof(float),t_data_ptr,size*sizeof(float));
+            assert(code == 0);
+            return true;
+
+
         }
         float& at(int n, int d, int h, int w, int c) {
             return data[((n * D + d) * H + h) * W * C + w * C + c];
+        }
+        float* ptr(){
+            return data.data();
         }
     private:
         // 数据在这里
