@@ -195,12 +195,16 @@ int32_t AddGridSamplePlugin::enqueue(PluginTensorDesc const* inputDesc, PluginTe
     if(err != cudaSuccess) {
         printf("Error in enqueue: %s\n", cudaGetErrorString(err));
     }
+
+
+
     nvinfer1::Dims input0_dims = inputDesc[0].dims;
     m_batch = input0_dims.d[0];
     m_input_channel =  input0_dims.d[1];
     m_grid_depth = m_input_depth =  input0_dims.d[2];
     m_grid_height = m_input_height =  input0_dims.d[3];
     m_grid_width = m_input_width =  input0_dims.d[4];
+    m_data_type = inputDesc[0].type;
     if(m_data_type == DataType::kFLOAT) {
         status = grid_sample_3d_cuda<float>(
             static_cast<const float*>(inputs[0]),
@@ -225,6 +229,8 @@ int32_t AddGridSamplePlugin::enqueue(PluginTensorDesc const* inputDesc, PluginTe
             static_cast<half*>(outputs[0]),
             stream
         );
+    }else{
+        printf("Error : unsupport datatype: %d\n",static_cast<int>(m_data_type));
     }
 
     return status;

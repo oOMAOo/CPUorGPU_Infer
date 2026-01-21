@@ -140,7 +140,7 @@ __global__ void grid_sample_3d_bilinear_kernel(
     if(tid >= N * D_grid * H_grid * W_grid) {
         return;
     }
-
+    
     // NDHW3 grid
     auto n = tid / (D_grid * H_grid * W_grid);
     auto d = (tid / (H_grid * W_grid)) % D_grid;
@@ -156,7 +156,6 @@ __global__ void grid_sample_3d_bilinear_kernel(
     const scalar_t x = *grid_NDHW_offset;
     const scalar_t y = *(grid_NDHW_offset + grid_stride_XYZ);
     const scalar_t z = *(grid_NDHW_offset + 2 * grid_stride_XYZ);
-
 
     scalar_t ix = compute_index(x, W_in, padding_mode_type, align_corners);
     scalar_t iy = compute_index(y, H_in, padding_mode_type, align_corners);
@@ -180,7 +179,6 @@ __global__ void grid_sample_3d_bilinear_kernel(
 
     scalar_t *input_NC_offset = const_cast<scalar_t *>(input_N_offset);
     scalar_t *output_NCDHW_offset = output_N_offset + d * output_stride_D + h * output_stride_H + w * output_stride_W;
-
     for(auto c = 0; c < C; c++) {
         scalar_t value = static_cast<scalar_t>(0);
         if(x1 >= 0 && x1 < W_in && y1 >= 0 && y1 < H_in && z1 >= 0 && z1 < D_in) {
@@ -210,7 +208,6 @@ __global__ void grid_sample_3d_bilinear_kernel(
         *output_NCDHW_offset = value;
         input_NC_offset += input_stride_C;
         output_NCDHW_offset += output_stride_C;
-          
     }
     
 }
@@ -227,7 +224,6 @@ int grid_sample_3d_cuda(
     scalar_t* output,
     cudaStream_t stream
 ) {
-    
 
     size_t totalThreads = N * D_grid * W_grid * H_grid;
     dim3 dimBlock(NUM_THREADS);
@@ -254,7 +250,6 @@ int grid_sample_3d_cuda(
     MyGridSamplePaddingMode padding_mode_type = padding_mode == "border" ? MyGridSamplePaddingMode::Border : 
                                                 padding_mode == "reflection" ? MyGridSamplePaddingMode::Reflection : 
                                                 MyGridSamplePaddingMode::Zeros;
-
     if(mode == "bilinear") {
         grid_sample_3d_bilinear_kernel<scalar_t><<<dimGrid, dimBlock, 0, stream>>>(
             input,
@@ -284,14 +279,11 @@ int grid_sample_3d_cuda(
     } else {
         return 1;
     }
-
-    cudaDeviceSynchronize();
-
+    cudaStreamSynchronize(stream);
     cudaError_t err = cudaGetLastError();
     if(err != cudaSuccess) {
         printf("Error in grid_sample_3d_cuda: %s\n", cudaGetErrorString(err));
     }
-
     return cudaGetLastError() != cudaSuccess;
 }
 

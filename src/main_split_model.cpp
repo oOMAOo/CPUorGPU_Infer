@@ -197,13 +197,28 @@ int main(){
     for (int i = 0; i < output_datas.size(); i++)
     {
         float* out_data = output_datas[i].data();
+        auto tran_start = std::chrono::steady_clock::now();
+        auto output_image_opt = cuda_tool ? cuda_tool->DatatoImage(&out_data,INPUT_H*INPUT_W*3,255.0f) : inference_common::DatatoImage(&out_data,INPUT_H,INPUT_W,3,255.0f);
+        auto tran_end = std::chrono::steady_clock::now();
+        double tran_time = std::chrono::duration<double, std::milli>(tran_end - tran_start).count();
+        std::cout << std::format("----------------- transfor image used time : {} ms -----------------\n", tran_time);
+        output_datas[i].clear();
+        output_datas[i].shrink_to_fit();
+        if(output_image_opt.has_value()){
+            cv::Mat output_image = output_image_opt.value();
+            cv::cvtColor(output_image, output_image, cv::COLOR_RGB2BGR);
+            // 显示
+            // cv::imshow("input", image);
+            cv::resize(output_image,output_image,cv::Size(INPUT_W,INPUT_H));
+            cv::imshow("Output", output_image);
+            cv::waitKey(0);
+        }else {
+            std::cerr << "DatatoImage Error" << std::endl;
+        }
         std::cout << std::format("OutPutData:{}  ->   first data [{}]\n",i,*out_data);
     }
     output_datas.clear();
     output_datas.shrink_to_fit();
-
-    
-
 
     //清理测试数据
     for (size_t i = 0; i < model_1_input_datas.size(); i++)
