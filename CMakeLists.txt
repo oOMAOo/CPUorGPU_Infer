@@ -127,33 +127,57 @@ file(GLOB KERNELS_FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/kernels/*.cu")
 
 message(STATUS "Found Core files: ${CORE_FILES}")
 message(STATUS "Found KERNELS_FILES files: ${KERNELS_FILES}")
+message("\n----------- INCLUDE -------------\n" ${IncludeDirs})
+message("\n----------- LIBRARY ----------\n" ${LibDirs})
 
-# 添加可执行文件
-add_executable(${PROJECT_NAME}
-    src/main_split_model.cpp
-    ${KERNELS_FILES}
-    ${CORE_FILES}
-)
-
-target_include_directories(${PROJECT_NAME} PRIVATE
+add_library(common_lib INTERFACE)
+target_include_directories(common_lib INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/plugins/addgridsamplePlugin
     ${IncludeDirs}
 )
-message("\n----------- INCLUDE -------------\n" ${IncludeDirs})
-message("\n----------- LIBRARY ----------\n" ${LibDirs})
-
-
 # 添加lib目录
-target_link_directories(${PROJECT_NAME} PRIVATE
+target_link_directories(common_lib INTERFACE
     ${LibDirs}
 )
 foreach(libdir ${LibDirs})
     message(Add lib Dir:${libdir})
     file(GLOB libs "${libdir}/*.lib")
-    target_link_libraries(${PROJECT_NAME} PRIVATE ${libs})
+    target_link_libraries(common_lib INTERFACE ${libs})
 endforeach()
-target_link_libraries(${PROJECT_NAME} PRIVATE trt_plugins)
+target_link_libraries(common_lib INTERFACE trt_plugins)
+
+# 添加可执行文件
+add_executable(main
+    src/main.cpp
+    ${KERNELS_FILES}
+    ${CORE_FILES}
+)
+target_link_libraries(main PRIVATE common_lib)
+
+# 添加可执行文件
+add_executable(model_diff
+    src/model_diff.cpp
+    ${KERNELS_FILES}
+    ${CORE_FILES}
+)
+target_link_libraries(model_diff PRIVATE common_lib)
+
+# 添加可执行文件
+add_executable(main_split_model
+    src/main_split_model.cpp
+    ${KERNELS_FILES}
+    ${CORE_FILES}
+)
+target_link_libraries(main_split_model PRIVATE common_lib)
+# 添加可执行文件
+add_executable(yolo_infer
+    src/yolo_infer.cpp
+    ${KERNELS_FILES}
+    ${CORE_FILES}
+)
+target_link_libraries(yolo_infer PRIVATE common_lib)
+
 foreach(bindir ${BinDirs})
     message(Add Bin Dir:${bindir})
     file(GLOB dlls "${bindir}/*")

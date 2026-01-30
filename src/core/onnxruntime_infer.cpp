@@ -36,26 +36,39 @@ ResultData<std::string> OnnxRuntimeInfer::LoadModel(std::string file_path,
         // session_options->SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_DISABLE_ALL);
 
         if (true) {
-
-            // OrtTensorRTProviderOptions opt;
-            // opt.device_id = 0;
-            // opt.trt_max_partition_iterations = 10;
-            // opt.trt_engine_cache_enable = 1;
-            // opt.trt_engine_cache_path = "./model/";
-            // session_options->AppendExecutionProvider_TensorRT(opt);
-
+            // ============ 设置 TensorRT 提供器 ============
+            OrtTensorRTProviderOptionsV2* trt_options = nullptr;
+            Ort::ThrowOnError(Ort::GetApi().CreateTensorRTProviderOptions(&trt_options));
+            
+            std::vector<const char*> keys = {
+                "device_id",
+                "trt_engine_cache_enable",
+                "trt_engine_cache_path",
+                "trt_extra_plugin_lib_paths"
+            };
+            std::vector<const char*> values = {
+                "0",
+                "1",
+                "D:\\workplace\\CPUorGPU_Infer\\build\\model\\model",
+                "D:\\workplace\\WarpingSpade_SpeedTest\\plugins\\trt_plugins.dll"
+            };
+            Ort::ThrowOnError(Ort::GetApi().UpdateTensorRTProviderOptions(
+                trt_options, 
+                keys.data(), 
+                values.data(), 
+                keys.size()
+            ));
+            session_options->AppendExecutionProvider_TensorRT_V2(*trt_options);
+    
             std::unordered_map<std::string, std::string> options;
             options["device_type"] = "CPU";
             options["disable_dynamic_shapes"] = "true";
             std::string config = R"({
             "CPU": {
-                    "INFERENCE_PRECISION_HINT": "f32",
-                    "NUM_STREAMS": "3",
-                    "INFERENCE_NUM_THREADS": "8"
+                    "INFERENCE_PRECISION_HINT": "f32"
             }
             })";
             options["load_config"] = config;
-            std::cout << "OpenVINO device type is set to: " << options["device_type"] << std::endl;
             session_options->AppendExecutionProvider_OpenVINO_V2(options);
         }
         session_options->SetGraphOptimizationLevel(

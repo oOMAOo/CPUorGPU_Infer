@@ -44,7 +44,7 @@ inline std::vector<float> readDataFromFile(const char* file_path){
     std::string line;
     while (std::getline(file,line))
     {
-        data.push_back(atof(line.c_str()));
+        data.push_back(static_cast<float>(atof(line.c_str())));
     }
     file.close();
     return std::move(data);

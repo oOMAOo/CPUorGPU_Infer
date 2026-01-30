@@ -21,7 +21,7 @@
 //1862.054ms
 int main(){
     std::string input_img = "C:\\Users\\影擎星图\\Desktop\\nafnet_demo\\CUDA-13.1.png";
-    std::string model_path = "C:\\Users\\影擎星图\\Desktop\\nafnet_demo\\warping_spade1.onnx";
+    std::string model_path = "C:\\Users\\影擎星图\\Desktop\\nafnet_demo\\warping_spade_new.onnx";
 
     if(!std::filesystem::is_regular_file(std::filesystem::path(std::u8string(input_img.begin(),input_img.end()))) || !std::filesystem::is_regular_file(std::u8string(model_path.begin(),model_path.end()))){
         std::cerr << "<(E`_`E)> Model path/Image path is invalid, please check your path." << std::endl;;
@@ -49,6 +49,7 @@ int main(){
     input_layouts.emplace_back(LayoutShape{"NCHW", {1,32,16,64,64}});
     input_layouts.emplace_back(LayoutShape{"NCHW", {1,21,3}});
     input_layouts.emplace_back(LayoutShape{"NCHW", {1,21,3}});
+    // input_layouts.emplace_back(LayoutShape{"NCHW", {1,3,INPUT_H,INPUT_W}});
 
     std::vector<LayoutShape> output_layouts;
     output_layouts.emplace_back(LayoutShape{"NCHW", {1,3,INPUT_H,INPUT_W}});
