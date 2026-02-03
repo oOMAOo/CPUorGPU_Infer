@@ -83,23 +83,25 @@ bool inference_common::GetAvailableCUDA()
 
 
 /// @brief 不破坏内容宽高比
-void inference_common::resizeImageWithPadding(cv::Mat& ori_image,const cv::Size& new_size,int& padding_left,int& padding_top){
+void inference_common::resizeImageWithPadding(cv::Mat& ori_image,const cv::Size& new_size,cv::Size& resize_size,int& padding_right,int& padding_bottom){
     float scale_w = static_cast<float>(new_size.width) / ori_image.cols;
     float scale_h = static_cast<float>(new_size.height) / ori_image.rows;
     //贴着右、下放置
     if(scale_h < scale_w){
-        //图像的高度更接近缩放后高度 左侧使用padding补上
+        //图像的高度更接近缩放后高度 右侧使用padding补上
         int resize_w = ori_image.cols * scale_h;
-        padding_left = new_size.width - resize_w;
-        cv::resize(ori_image,ori_image,cv::Size(resize_w,new_size.height),0.0,0.0,cv::INTER_CUBIC);
-        cv::copyMakeBorder(ori_image,ori_image,0,0,padding_left,0,cv::BORDER_CONSTANT,cv::Scalar(0,0,0));
+        padding_right = new_size.width - resize_w;
+        resize_size = cv::Size(resize_w,new_size.height);
+        cv::resize(ori_image,ori_image,resize_size,0.0,0.0,cv::INTER_CUBIC);
+        cv::copyMakeBorder(ori_image,ori_image,0,0,0,padding_right,cv::BORDER_CONSTANT,cv::Scalar(0,0,0));
         
     }else{
-        //图像的宽度更接近缩放后高度 上方使用padding补上
+        //图像的宽度更接近缩放后高度 下方使用padding补上
         int resize_h = ori_image.rows * scale_w;
-        padding_top = new_size.height - resize_h;
-        cv::resize(ori_image,ori_image,cv::Size(new_size.width, resize_h),0.0,0.0,cv::INTER_CUBIC);
-        cv::copyMakeBorder(ori_image,ori_image,padding_top,0,0,0,cv::BORDER_CONSTANT,cv::Scalar(0,0,0));
+        padding_bottom = new_size.height - resize_h;
+        resize_size = cv::Size(new_size.width, resize_h);
+        cv::resize(ori_image,ori_image,resize_size,0.0,0.0,cv::INTER_CUBIC);
+        cv::copyMakeBorder(ori_image,ori_image,0,padding_bottom,0,0,cv::BORDER_CONSTANT,cv::Scalar(0,0,0));
     }
 }
 

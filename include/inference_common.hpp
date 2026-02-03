@@ -41,6 +41,6 @@ namespace inference_common
     std::optional<cv::Mat> DatatoImage(float** data_p,int H,int W, int C,float scale);
     // std::optional<float**> inference_common::Image2Data(cv::Mat image);
     bool GetAvailableCUDA();
-    void resizeImageWithPadding(cv::Mat& ori_image,const cv::Size& new_size,int& padding_right,int& padding_bottom);
+    void resizeImageWithPadding(cv::Mat& ori_image,const cv::Size& new_size,cv::Size& resize_size,int& padding_right,int& padding_bottom);
 };
 
