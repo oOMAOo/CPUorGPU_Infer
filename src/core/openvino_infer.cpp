@@ -1,7 +1,8 @@
 #include "openvino_infer.hpp"
 #include <format>
+#include <openvino/frontend/extension.hpp>
 #include "inference_common.hpp"
-
+#include "openvino_plugins/addgridsamplePlugin/addgridsampleplugin.hpp"
 
 const DEVICE_TYPE OpenVinoInfer::GetInferenceType() const{
     return DEVICE_TYPE::OpenVino;
@@ -64,6 +65,10 @@ ResultData<std::string> OpenVinoInfer::LoadModel(std::string file_path,
             std::string save_path = std::format("{}/{}.xml",MODELPATH,file_path.substr(0,file_path.find_last_of('.')));
             std::cout << "    Save model path: " << save_path << std::endl;
             return_data.result_info = save_path;
+            
+            auto MyGridSample_extension = ov::frontend::OpExtension<TemplateExtension::AddGridSamplePlugin>("MyGridSample");
+            m_core->add_extension(MyGridSample_extension);
+            
             if (!std::filesystem::exists(save_path)) {
                 //临时创建一个模型用于创建引擎文件
                 auto temp_model = m_core->read_model(model_path);

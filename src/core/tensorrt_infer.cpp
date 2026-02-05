@@ -6,7 +6,7 @@
 #include <NvOnnxParser.h>
 #include "inference_common.hpp"
 #include "cuda_fun.hpp"
-#include "addgridsampleplugin.hpp"
+#include "trt_plugins/addgridsamplePlugin/addgridsampleplugin.hpp"
 class Logger : public nvinfer1::ILogger {
 public:
     void log(Severity severity, const char* msg) noexcept override {

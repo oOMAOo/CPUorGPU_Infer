@@ -21,19 +21,19 @@ if(NOT DEFINED TensorRT_INCLUDE_DIR)
 endif()
 
 function(add_plugin_source)
-    target_sources(trt_plugins PRIVATE ${ARGN})
+    target_sources(${PROJECT_NAME} PRIVATE ${ARGN})
 endfunction()
 #插件列表
 set(TRT_PLUGIN_NAMES
     addgridsamplePlugin
 )
 
-target_include_directories(trt_plugins PRIVATE 
+target_include_directories(${PROJECT_NAME} PRIVATE 
     common 
     ${CUDA_INCLUDE_DIR} 
     ${TensorRT_INCLUDE_DIR}
 )
-target_link_directories(trt_plugins PRIVATE 
+target_link_directories(${PROJECT_NAME} PRIVATE 
     ${CUDA_LIB_DIR} 
     ${TensorRT_LIB_DIR}
 )

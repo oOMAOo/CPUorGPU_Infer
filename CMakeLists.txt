@@ -47,8 +47,8 @@ set(BinDirs "")
 
 # ============================= OpenCV =============================
 set(OpenCV_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/dep/opencv)
-set(OpenCV_INCLUDE_DIR ${OpenCV_ROOT}/include)
-set(OpenCV_LIB_DIR ${OpenCV_ROOT}/lib)
+set(OpenCV_INCLUDE_DIR ${OpenCV_ROOT}/include  CACHE STRING "opencv include dir")
+set(OpenCV_LIB_DIR ${OpenCV_ROOT}/lib  CACHE STRING "opencv include dir")
 set(OpenCV_BIN_DIR ${OpenCV_ROOT}/bin)
 list(APPEND IncludeDirs ${OpenCV_INCLUDE_DIR})
 # Only Windows 64
@@ -58,6 +58,7 @@ if(CMAKE_SYSTEM_PROCESSOR STREQUAL "AMD64" AND WIN32)
 endif()
 
 # ========================== Eigen ========================== 
+set(Eigen_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/dep CACHE STRING "Eigen include dir")
 list(APPEND IncludeDirs ${CMAKE_CURRENT_SOURCE_DIR}/dep)
 
 # =============== CUDA （需根据安装自行替换路径） ===============
@@ -74,7 +75,7 @@ endif()
 # ========================== TensorRT ==========================
 set(TensorRT_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/dep/tensorrt)
 set(TensorRT_INCLUDE_DIR ${TensorRT_ROOT}/include CACHE STRING "tensorRT include dir")
-set(TensorRT_LIB_DIR ${TensorRT_ROOT}/lib CACHE STRING "tensorRT include dir")
+set(TensorRT_LIB_DIR ${TensorRT_ROOT}/lib CACHE STRING "tensorRT lib dir")
 set(TensorRT_BIN_DIR ${TensorRT_ROOT}/bin)
 list(APPEND IncludeDirs ${TensorRT_INCLUDE_DIR})
 # Only Windows 64
@@ -82,21 +83,21 @@ if(CMAKE_SYSTEM_PROCESSOR STREQUAL "AMD64" AND WIN32)
     list(APPEND LibDirs ${TensorRT_LIB_DIR})
     list(APPEND BinDirs ${TensorRT_BIN_DIR})
 # 添加插件
-add_subdirectory(plugins)
+add_subdirectory(trt_plugins)
 endif()
  
 message("=================================================================${CMAKE_BUILD_TYPE}")
 # ============================= OpenVINO =============================
 set(OpenVINO_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/dep/openvino)
-set(OpenVINO_INCLUDE_DIR ${OpenVINO_ROOT}/include)
+set(OpenVINO_INCLUDE_DIR ${OpenVINO_ROOT}/include CACHE STRING "OpenVINO include dir")
 list(APPEND IncludeDirs ${OpenVINO_INCLUDE_DIR})
 # Only Windows 64
 if(CMAKE_SYSTEM_PROCESSOR STREQUAL "AMD64" AND WIN32)
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-        set(OpenVINO_LIB_DIR ${OpenVINO_ROOT}/lib/intel64/Debug)
+        set(OpenVINO_LIB_DIR ${OpenVINO_ROOT}/lib/intel64/Debug CACHE STRING "OpenVINO lib dir")
         set(OpenVINO_BIN_DIR ${OpenVINO_ROOT}/bin/intel64/Debug)
     elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
-        set(OpenVINO_LIB_DIR ${OpenVINO_ROOT}/lib/intel64/Release)
+        set(OpenVINO_LIB_DIR ${OpenVINO_ROOT}/lib/intel64/Release CACHE STRING "OpenVINO lib dir")
         set(OpenVINO_BIN_DIR ${OpenVINO_ROOT}/bin/intel64/Release)
     else()
         message(Error: please choose Debug/Release for 'CMAKE_BUILD_TYPE')
@@ -105,8 +106,10 @@ if(CMAKE_SYSTEM_PROCESSOR STREQUAL "AMD64" AND WIN32)
     list(APPEND BinDirs ${OpenVINO_BIN_DIR})
 else()
     message(Error: support AMD64 only, current processor: ${CMAKE_SYSTEM_PROCESSOR})
-endif()
 
+endif()
+# 添加插件
+add_subdirectory(openvino_plugins)
 # ============================= OnnxRuntime =============================
 set(OnnxRuntime_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/dep/onnxruntime_gpu)
 set(OnnxRuntime_INCLUDE_DIR ${OnnxRuntime_ROOT}/include)
@@ -133,7 +136,7 @@ message("\n----------- LIBRARY ----------\n" ${LibDirs})
 add_library(common_lib INTERFACE)
 target_include_directories(common_lib INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/plugins/addgridsamplePlugin
+    ${CMAKE_CURRENT_SOURCE_DIR}
     ${IncludeDirs}
 )
 # 添加lib目录
@@ -146,6 +149,7 @@ foreach(libdir ${LibDirs})
     target_link_libraries(common_lib INTERFACE ${libs})
 endforeach()
 target_link_libraries(common_lib INTERFACE trt_plugins)
+target_link_libraries(common_lib INTERFACE openvino_plugins)
 
 # 添加可执行文件
 add_executable(main
@@ -177,6 +181,14 @@ add_executable(yolo_infer
     ${CORE_FILES}
 )
 target_link_libraries(yolo_infer PRIVATE common_lib)
+
+# 添加可执行文件
+add_executable(gridsample_test
+    src/gridsample_test.cpp
+    ${KERNELS_FILES}
+    ${CORE_FILES}
+)
+target_link_libraries(gridsample_test PRIVATE common_lib)
 
 foreach(bindir ${BinDirs})
     message(Add Bin Dir:${bindir})

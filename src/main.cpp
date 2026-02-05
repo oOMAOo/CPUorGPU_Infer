@@ -21,7 +21,7 @@
 //1862.054ms
 int main(){
     std::string input_img = "C:\\Users\\影擎星图\\Desktop\\nafnet_demo\\CUDA-13.1.png";
-    std::string model_path = "C:\\Users\\影擎星图\\Desktop\\nafnet_demo\\warping_spade_new.onnx";
+    std::string model_path = "C:\\Users\\影擎星图\\Desktop\\nafnet_demo\\warping_spade1.onnx";
 
     if(!std::filesystem::is_regular_file(std::filesystem::path(std::u8string(input_img.begin(),input_img.end()))) || !std::filesystem::is_regular_file(std::u8string(model_path.begin(),model_path.end()))){
         std::cerr << "<(E`_`E)> Model path/Image path is invalid, please check your path." << std::endl;;
@@ -33,12 +33,12 @@ int main(){
     //TODO 增加显卡版本检测
     bool availableCUDA = inference_common::GetAvailableCUDA();
     std::unique_ptr<CudaFun> cuda_tool = nullptr;
-    if(availableCUDA){
-        api_tool = new TensorRTInfer();
-        cuda_tool = std::make_unique<CudaFun>(INPUT_H,INPUT_W,3);
-    }else{
+    // if(availableCUDA){
+        // api_tool = new TensorRTInfer();
+    //     cuda_tool = std::make_unique<CudaFun>(INPUT_H,INPUT_W,3);
+    // }else{
         api_tool = new OpenVinoInfer();
-    }
+    // }
     // api_tool = new OnnxRuntimeInfer();
 
     // ==================== 1. 创建基础推理引擎 ====================
@@ -46,9 +46,9 @@ int main(){
 
     using LayoutShape = std::pair<std::string,std::vector<size_t>>;
     std::vector<LayoutShape> input_layouts;
-    input_layouts.emplace_back(LayoutShape{"NCHW", {1,32,16,64,64}});
-    input_layouts.emplace_back(LayoutShape{"NCHW", {1,21,3}});
-    input_layouts.emplace_back(LayoutShape{"NCHW", {1,21,3}});
+    input_layouts.emplace_back(LayoutShape{"NC...", {1,32,16,64,64}});
+    input_layouts.emplace_back(LayoutShape{"NC...", {1,21,3}});
+    input_layouts.emplace_back(LayoutShape{"NC...", {1,21,3}});
     // input_layouts.emplace_back(LayoutShape{"NCHW", {1,3,INPUT_H,INPUT_W}});
 
     std::vector<LayoutShape> output_layouts;
@@ -60,6 +60,8 @@ int main(){
             return -1;
         }
     }
+    //0.19562 | 0.163566 | 0.196407 | 0.194865 | 0.202482 | 0.204522 | 0.191374 | 0.181597 | 0.198211 | 0.191047
+    //0.195589 | 0.163502 | 0.196259 | 0.195076 | 0.202707 | 0.204838 | 0.191625 | 0.181881 | 0.198311 | 0.191297
     // ==================== 2. 加载模型文件 ====================
     ResultData<std::string> load_state = api_tool->LoadModel(model_path,input_layouts,output_layouts);
     if(!load_state.result_state){
@@ -90,19 +92,20 @@ int main(){
     // ==================== 5. 推理 ====================
 
     // 测试推理 200 次
-    // double min_time = std::numeric_limits<double>::max();
-    // for (size_t i = 0; i < 200; i++)
-    // {
-    //     auto start = std::chrono::steady_clock::now();
-    //     bool output_state = api_tool->Infer({reinterpret_cast<float*>(blob.data)},output_datas);
-    //     auto end = std::chrono::steady_clock::now();
-    //     double cost_time = std::chrono::duration<double,std::milli>(end - start).count();
-    //     min_time = std::min(min_time, cost_time);
-    //     if(!output_state){
-    //         return -1;
-    //     }
-    // }
-    // std::cout << std::format("----------------- Infer image used time : {} ms -----------------\n", min_time);
+    double min_time = std::numeric_limits<double>::max();
+    for (size_t i = 0; i < 200; i++)
+    {
+        auto start = std::chrono::steady_clock::now();
+        // bool output_state = api_tool->Infer({reinterpret_cast<float*>(blob.data)},output_datas);
+        bool output_state = api_tool->Infer(input_datas,output_datas);
+        auto end = std::chrono::steady_clock::now();
+        double cost_time = std::chrono::duration<double,std::milli>(end - start).count();
+        min_time = std::min(min_time, cost_time);
+        if(!output_state){
+            return -1;
+        }
+    }
+    std::cout << std::format("----------------- Infer image used time : {} ms -----------------\n", min_time);
 
     auto infer_start = std::chrono::steady_clock::now();
     // bool output_state = api_tool->Infer({reinterpret_cast<float*>(blob.data)},output_datas);
@@ -111,30 +114,34 @@ int main(){
     double infer_time = std::chrono::duration<double, std::milli>(infer_end - infer_start).count();
     std::cout << std::format("----------------- Infer image used time : {} ms -----------------\n", infer_time);
     
-
-    // ==================== 6. 整理结果 ====================
-    for (int i = 0; i < output_datas.size(); i++)
+    //========================== 推理 ==========================
+    for (size_t i = 990; i < 1000; i++)
     {
-        float* out_data = output_datas[i].data();
-        auto tran_start = std::chrono::steady_clock::now();
-        auto output_image_opt = cuda_tool ? cuda_tool->DatatoImage(&out_data,INPUT_H*INPUT_W*3,255.0f) : inference_common::DatatoImage(&out_data,INPUT_H,INPUT_W,3,255.0f);
-        auto tran_end = std::chrono::steady_clock::now();
-        double tran_time = std::chrono::duration<double, std::milli>(tran_end - tran_start).count();
-        std::cout << std::format("----------------- transfor image used time : {} ms -----------------\n", tran_time);
-        output_datas[i].clear();
-        output_datas[i].shrink_to_fit();
-        if(output_image_opt.has_value()){
-            cv::Mat output_image = output_image_opt.value();
-            cv::cvtColor(output_image, output_image, cv::COLOR_RGB2BGR);
-            // 显示
-            // cv::imshow("input", image);
-            cv::resize(output_image,output_image,image.size());
-            cv::imshow("Output", output_image);
-            cv::waitKey(0);
-        }else {
-            std::cerr << "DatatoImage Error" << std::endl;
-        }
+        std::cout << (output_datas[0][i]) << (i==999 ? "" : " | ");
     }
+    // ==================== 6. 整理结果 ====================
+    // for (int i = 0; i < output_datas.size(); i++)
+    // {
+    //     float* out_data = output_datas[i].data();
+    //     auto tran_start = std::chrono::steady_clock::now();
+    //     auto output_image_opt = cuda_tool ? cuda_tool->DatatoImage(&out_data,INPUT_H*INPUT_W*3,255.0f) : inference_common::DatatoImage(&out_data,INPUT_H,INPUT_W,3,255.0f);
+    //     auto tran_end = std::chrono::steady_clock::now();
+    //     double tran_time = std::chrono::duration<double, std::milli>(tran_end - tran_start).count();
+    //     std::cout << std::format("----------------- transfor image used time : {} ms -----------------\n", tran_time);
+    //     output_datas[i].clear();
+    //     output_datas[i].shrink_to_fit();
+    //     if(output_image_opt.has_value()){
+    //         cv::Mat output_image = output_image_opt.value();
+    //         cv::cvtColor(output_image, output_image, cv::COLOR_RGB2BGR);
+    //         // 显示
+    //         // cv::imshow("input", image);
+    //         cv::resize(output_image,output_image,image.size());
+    //         cv::imshow("Output", output_image);
+    //         cv::waitKey(0);
+    //     }else {
+    //         std::cerr << "DatatoImage Error" << std::endl;
+    //     }
+    // }
     delete[] input1;
     delete[] input2;
     delete[] input3;
